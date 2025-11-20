@@ -1,71 +1,158 @@
 import 'dotenv/config';
 import express from 'express';
 import {
-  ButtonStyleTypes,
-  InteractionResponseFlags,
   InteractionResponseType,
   InteractionType,
-  MessageComponentTypes,
   verifyKeyMiddleware,
 } from 'discord-interactions';
-import { getRandomEmoji, DiscordRequest } from './utils.js';
-import { getShuffledOptions, getResult } from './game.js';
 
-// Create an express app
+import { getKillCount } from './utils/getKillCount.js';
+import {getDeathCount} from "./utils/getDeathCount.js";
+import { Client, GatewayIntentBits } from 'discord.js';
+
+
 const app = express();
-// Get port, or default to 3000
 const PORT = process.env.PORT || 3000;
-// To keep track of our active games
-const activeGames = {};
 
-/**
- * Interactions endpoint URL where Discord will send HTTP requests
- * Parse request body and verifies incoming requests using discord-interactions package
- */
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
+});
+
 app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async function (req, res) {
-  // Interaction id, type and data
   const { id, type, data } = req.body;
 
-  /**
-   * Handle verification requests
-   */
   if (type === InteractionType.PING) {
     return res.send({ type: InteractionResponseType.PONG });
   }
 
-  /**
-   * Handle slash command requests
-   * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
-   */
   if (type === InteractionType.APPLICATION_COMMAND) {
-    const { name } = data;
+    const { name, options } = data;
 
-    // "test" command
-    if (name === 'test') {
-      // Send a message into the channel where command was triggered from
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          flags: InteractionResponseFlags.IS_COMPONENTS_V2,
-          components: [
-            {
-              type: MessageComponentTypes.TEXT_DISPLAY,
-              // Fetches a random emoji to send from a helper function
-              content: `hello world ${getRandomEmoji()}`
-            }
-          ]
-        },
-      });
+    //
+    // ---------- /lookup <username> ----------
+    //
+    if (name === 'lookup') {
+      const username = options[0].value;
+      try {
+        const kills = await getKillCount(username);
+        const deaths = await getDeathCount(username);
+        const killsValue = Number(kills.kills);
+        const deathsValue = Number(deaths);
+        let line = "";
+
+        if (!kills || !deaths) {
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Player not found! (**${username}**)` }
+          });
+        }
+
+        if (killsValue < deathsValue) {
+          line = "❌ NEGATIVE KDR";
+        } else {
+          line = "✅ POSITIVE KDR";
+        }
+
+        // Reageer eerst op het command
+        res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: `🔍 **${username}** has **${kills.kills}** kills and **${deaths}** deaths | Elo: **${kills.elo}** (**${line}**)` }
+        });
+
+      } catch (err) {
+        console.error(err);
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: `❌ REQUEST ERROR` }
+        });
+      }
+    } else {
+      console.error(`Unknown command: ${name}`);
+      return res.status(400).json({ error: 'unknown command' });
     }
-
-    console.error(`unknown command: ${name}`);
-    return res.status(400).json({ error: 'unknown command' });
+  } else {
+    console.error('Unknown interaction type', type);
+    return res.status(400).json({ error: 'unknown interaction type' });
   }
-
-  console.error('unknown interaction type', type);
-  return res.status(400).json({ error: 'unknown interaction type' });
 });
 
-app.listen(PORT, () => {
-  console.log('Listening on port', PORT);
-});
+export default function registerEventListeners(client) {
+
+  client.on('messageCreate', async (message) => {
+    // Check dat het van de Apply-bot komt en in #accept
+    if (message.channelId !== process.env.ACCEPT_CHANNEL_ID) return;
+    if (!message.author.bot) return;
+    if (!message.embeds?.length) return;
+
+    const embed = message.embeds[0];
+    const title = embed.title;
+    if (!title || !title.includes('Application Submitted')) return;
+
+    // Pak de Submission stats embed field
+    const statsField = embed.fields.find(f => f.name === "Submission stats");
+    if (!statsField) return;
+
+    // Haal Discord user ID
+    const idMatch = statsField.value.match(/User: <@(\d+)>/);
+    if (!idMatch) return;
+    const discordUserId = idMatch[1];
+
+    try {
+      // Haal member op en pak nickname
+      const guild = await client.guilds.fetch(message.guildId);
+      const member = await guild.members.fetch(discordUserId);
+      const discordUsername = member.displayName; // nickname in server
+      const dateToday = new Date().toISOString().split("T")[0];
+
+      const approverMatch = message.content.match(/by\s+@?([^\s]+)/);
+      const approverUsername = approverMatch ? approverMatch[1] : "unknown";
+
+
+
+      console.log("Accepted username:", discordUsername);
+
+      // Lookup kills & deaths
+      const kills = await getKillCount(discordUsername);
+      const deaths = await getDeathCount(discordUsername);
+      const killsValue = Number(kills.kills);
+      const deathsValue = Number(deaths);
+      let line = "";
+
+
+
+      // Stuur naar recruit-tracker
+      const recruitChannel = await client.channels.fetch(process.env.RECRUIT_CHANNEL_ID);
+      if (!recruitChannel) return console.log("❌ Recruit channel not found");
+
+      if (killsValue < deathsValue) {
+        line = "❌ NEGATIVE KDR";
+      } else {
+        line = "✅ POSITIVE KDR";
+      }
+
+      recruitChannel.send(`
+\`\`\`
+Found ${discordUsername} on the Roat pkz highscores! ✅
+\`\`\`
+🔍 **First** tracking of **${discordUsername}** on **${dateToday}**
+🔥 has **${kills.kills}** kills and **${deaths}** deaths | Elo: **${kills.elo}** (*${line}*)
+ℹ️ Easy **lookup** **#first${discordUsername}**
+📅 *TRACKED/ACCEPTED* BY ${approverUsername}
+`);
+
+
+
+    } catch (err) {
+      console.error("Error processing accepted application:", err);
+    }
+  });
+}
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => console.log('Bot logged in!'))
+    .catch(err => console.error('Login failed:', err));
+registerEventListeners(client);
+app.listen(PORT, () => console.log(`Listening on port ${PORT}`));

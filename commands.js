@@ -44,6 +44,23 @@ const CHALLENGE_COMMAND = {
   contexts: [0, 2],
 };
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND];
+const LOOKUP_COMMAND = {
+  name: "lookup",
+  description: "Lookup RoatPkz hiscore stats",
+  options: [
+    {
+      type: 3, // STRING
+      name: "username",
+      description: "RoatPkz username",
+      required: true,
+    }
+  ],
+  type: 1,
+  integration_types: [0, 1],
+  contexts: [0, 1, 2],
+};
+
+
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
