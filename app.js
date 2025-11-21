@@ -9,6 +9,7 @@ import {
 import { getKillCount } from './utils/getKillCount.js';
 import {getDeathCount} from "./utils/getDeathCount.js";
 import { Client, GatewayIntentBits } from 'discord.js';
+import {getJadAndSkotizo} from "./utils/getJadAndSkotizo.js";
 
 
 const app = express();
@@ -31,6 +32,40 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
 
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = data;
+
+
+    if (name === 'jadandskotizo') {
+      const username = options[0].value;
+
+      try {
+        const stats = await getJadAndSkotizo(username);
+
+        if (!stats) {
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: `❌ Player not found! (**${username}**)` }
+          });
+        }
+
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content:
+                `🌋 **${username} – Jad & Skotizo Kills**
+🔥 TzTok-Jad Kills: **${stats.jad ?? 0}**
+👹 Skotizo Kills: **${stats.skotizo ?? 0}**`
+          }
+        });
+
+      } catch (err) {
+        console.error("jadandskotizo ERROR:", err);
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: `❌ Error fetching Jad/Skotizo kills` }
+        });
+      }
+    }
+
 
     //
     // ---------- /lookup <username> ----------
