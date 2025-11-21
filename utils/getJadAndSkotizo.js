@@ -13,8 +13,8 @@ export async function getJadAndSkotizo(username) {
         return { jad: 0, skotizo: 0 };
     }
 
-    const jad = $(values[72]).text().replace(/,/g, "").trim();
-    const skotizo = $(values[74]).text().replace(/,/g, "").trim();
+    const jad = $(values[71]).text().replace(/,/g, "").trim();
+    const skotizo = $(values[73]).text().replace(/,/g, "").trim();
 
     return {
         jad: jad || 0,
