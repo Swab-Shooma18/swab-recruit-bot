@@ -38,32 +38,23 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
       const username = options[0].value;
 
       try {
-        const stats = await getJadAndSkotizo(username);
-
-        if (!stats) {
-          return res.send({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Player not found (**${username}**)` }
-          });
-        }
-
-        const { jad: jadKills, skotizo: skotizoKills } = stats;
+        const { jad, skotizo } = await getJadAndSkotizo(username);
 
         return res.send({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
             content:
                 `🌋 **${username} – Jad & Skotizo Kills**
-🔥 TzTok-Jad Kills: **${jadKills}**
-👹 Skotizo Kills: **${skotizoKills}**`
+🔥 TzTok-Jad Kills: **${jad}**
+👹 Skotizo Kills: **${skotizo}**`
           }
         });
 
       } catch (err) {
-        console.error("❌ jadandskotizo ERROR:", err);
+        console.error("jadandskotizo ERROR:", err);
         return res.send({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: `❌ Error while fetching kills for **${username}**` }
+          data: { content: `❌ Error fetching Jad/Skotizo kills` }
         });
       }
     }
