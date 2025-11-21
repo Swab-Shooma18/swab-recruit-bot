@@ -13,8 +13,6 @@ export async function getKillCount(username) {
     if (values.length === 0) {
         return null;
     }
-
-
     const killCount = $(values[1]).text().replace(/,/g, '').trim();
     const elo = $(values[7]).text().replace(/,/g, '').trim()
 

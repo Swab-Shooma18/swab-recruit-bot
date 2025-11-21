@@ -13,8 +13,6 @@ export async function getDeathCount(username) {
     if (values.length === 0) {
         return null;
     }
-
-    // Pak de vierde <td class="value"> voor de echte deaths
     const deathCount = $(values[3]).text().replace(/,/g, '').trim();
 
     return deathCount;
