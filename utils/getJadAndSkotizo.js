@@ -5,20 +5,14 @@ export async function getJadAndSkotizo(username) {
     const url = `https://roatpkz.com/hiscore/user/${encodeURIComponent(username)}/normal/`;
     const res = await fetch(url);
     const html = await res.text();
-    const $ = cheerio.load(html);
 
-    function getValue(label) {
-        const row = $("td.label").filter(function () {
-            return $(this).text().trim() === label;
-        }).first();
+    // Regex voor Jad kills
+    const jadMatch = html.match(/TzTok-Jad Kills<\/td>\s*<td class="value">([\d,]+)<\/td>/i);
+    const jadKills = jadMatch ? jadMatch[1].replace(/,/g, "") : 0;
 
-        if (!row.length) return null;
+    // Regex voor Skotizo kills
+    const skotizoMatch = html.match(/Skotizo Kills<\/td>\s*<td class="value">([\d,]+)<\/td>/i);
+    const skotizoKills = skotizoMatch ? skotizoMatch[1].replace(/,/g, "") : 0;
 
-        return row.next("td.value").text().trim().replace(/,/g, "");
-    }
-
-    return {
-        jad: getValue("TzTok-Jad Kills"),
-        skotizo: getValue("Skotizo Kills")
-    };
+    return { jadKills, skotizoKills };
 }
