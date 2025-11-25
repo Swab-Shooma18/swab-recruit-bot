@@ -65,12 +65,14 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
             const username = options[0].value;
 
             try {
-                const player = await PlayerTracking.findOne({username});
+                const player = await PlayerTracking.findOne({
+                    username: { $regex: `^${username}$`, $options: 'i' }
+                });
 
                 if (!player) {
                     return res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        data: {content: `❌ Geen tracking gevonden voor **${username}**`}
+                        data: {content: `❌ NO TRACKING FOUND FOR **${username}**`}
                     });
                 }
 
