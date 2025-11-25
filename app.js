@@ -116,7 +116,6 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
 export default function registerEventListeners(client) {
 
   client.on('messageCreate', async (message) => {
-    // Check dat het van de Apply-bot komt en in #accept
     if (message.channelId !== process.env.ACCEPT_CHANNEL_ID) return;
     if (!message.author.bot) return;
     if (!message.embeds?.length) return;
@@ -125,73 +124,53 @@ export default function registerEventListeners(client) {
     const title = embed.title;
     if (!title || !title.includes('Application Submitted')) return;
 
-    // Pak de Submission stats embed field
     const statsField = embed.fields.find(f => f.name === "Submission stats");
     if (!statsField) return;
-    const kills = await getKillCount(username);
-    const deaths = await getDeathCount(username);
-    const jadandskotizo = await getJadAndSkotizo(username)
-    const killsValue = Number(kills.kills);
-    const deathsValue = Number(deaths);
 
-    // Haal Discord user ID
+    // --- EXTRACT DISCORD USER ID ---
     const idMatch = statsField.value.match(/User: <@(\d+)>/);
     if (!idMatch) return;
     const discordUserId = idMatch[1];
 
-// opslaan in database
-    await PlayerTracking.create(stats);
-
-    console.log("💾 Saved tracking to DB:", stats);
-
-
-
     try {
-      // Haal member op en pak nickname
       const guild = await client.guilds.fetch(message.guildId);
       const member = await guild.members.fetch(discordUserId);
-      const discordUsername = member.displayName; // nickname in server
-      const dateToday = new Date().toISOString().split("T")[0];
+      const discordUsername = member.displayName;
 
+      // --- APPROVER ---
       const approverMatch = message.content.match(/by\s+@?([^\s]+)/);
       const approverUsername = approverMatch ? approverMatch[1] : "unknown";
 
+      const dateToday = new Date().toISOString().split("T")[0];
 
+      // --- GET STATS NOW THAT WE KNOW THE USERNAME ---
+      const kills = await getKillCount(discordUsername);
+      const deaths = await getDeathCount(discordUsername);
+      const jadAndSkotizo = await getJadAndSkotizo(discordUsername);
 
-      console.log("Accepted username:", discordUsername);
+      const killsValue = Number(kills.kills);
+      const deathsValue = Number(deaths);
 
+      let line = killsValue < deathsValue ? "❌ NEGATIVE KDR" : "✅ POSITIVE KDR";
+
+      // --- BUILD OBJECT FOR DATABASE ---
       const stats = {
         username: discordUsername,
         kills: kills.kills,
         deaths: deaths,
         elo: kills.elo,
-        jadKills: jadandskotizo.jad,
-        skotizoKills: jadandskotizo.jad,
-        approver: approverUsername
+        jadKills: jadAndSkotizo.jad,
+        skotizoKills: jadAndSkotizo.skotizo,
+        approver: approverUsername,
+        date: dateToday
       };
 
       await PlayerTracking.create(stats);
-
       console.log("💾 Saved tracking to DB:", stats);
 
-      // Lookup kills & deaths
-      const kills = await getKillCount(discordUsername);
-      const deaths = await getDeathCount(discordUsername);
-      const killsValue = Number(kills.kills);
-      const deathsValue = Number(deaths);
-      let line = "";
-
-
-
-      // Stuur naar recruit-tracker
+      // --- SEND MESSAGE TO RECRUIT CHANNEL ---
       const recruitChannel = await client.channels.fetch(process.env.RECRUIT_CHANNEL_ID);
       if (!recruitChannel) return console.log("❌ Recruit channel not found");
-
-      if (killsValue < deathsValue) {
-        line = "❌ NEGATIVE KDR";
-      } else {
-        line = "✅ POSITIVE KDR";
-      }
 
       recruitChannel.send(`
 \`\`\`
@@ -201,9 +180,7 @@ Found ${discordUsername} on the Roat pkz highscores! ✅
 🔥 has **${kills.kills}** kills and **${deaths}** deaths | Elo: **${kills.elo}** (*${line}*)
 ℹ️ Easy **lookup** **#first${discordUsername}**
 📅 *TRACKED/ACCEPTED* BY ${approverUsername}
-`);
-
-
+      `);
 
     } catch (err) {
       console.error("Error processing accepted application:", err);
