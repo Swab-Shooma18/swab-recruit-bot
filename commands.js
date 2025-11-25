@@ -26,6 +26,22 @@ const TEST_COMMAND = {
   contexts: [0, 1, 2],
 };
 
+const CHECK_COMMAND = {
+  name: 'check',
+  description: 'Compare username with roat pkz highscores and our database!',
+  options: [
+    {
+      type: 3, // STRING
+      name: "username",
+      description: "RoatPkz username",
+      required: true,
+    }
+  ],
+  type: 1,
+  integration_types: [0, 1],
+  contexts: [0, 1, 2],
+};
+
 // Command containing options
 const CHALLENGE_COMMAND = {
   name: 'challenge',
@@ -77,6 +93,6 @@ const JAD_SKOTIZO_COMMAND = {
 };
 
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND];
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMANDs];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
