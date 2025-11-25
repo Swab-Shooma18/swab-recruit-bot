@@ -111,6 +111,66 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
   }
 });
 
+if (name === "check") {
+  const username = options[0].value;
+
+  try {
+    const player = await PlayerTracking.findOne({ username });
+
+    if (!player) {
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { content: `❌ Geen tracking gevonden voor **${username}**` }
+      });
+    }
+
+    // Live stats via highscores
+    const liveKills = await getKillCount(username);
+    const liveDeaths = await getDeathCount(username);
+
+    const liveKillCount = Number(liveKills.kills);
+    const liveDeathCount = Number(liveDeaths);
+
+    // old stats (first tracking)
+    const oldKills = Number(player.kills);
+    const oldDeaths = Number(player.deaths);
+
+    const diffKills = liveKillCount - oldKills;
+    const diffDeaths = liveDeathCount - oldDeaths;
+
+    const diffKillsStr = diffKills >= 0 ? `+${diffKills}` : `${diffKills}`;
+    const diffDeathsStr = diffDeaths >= 0 ? `+${diffDeaths}` : `${diffDeaths}`;
+
+    return res.send({
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `
+📊 **Progress check for ${username}**
+
+**🔥 Kills:**  
+First tracked: **${oldKills}**  
+Now: **${liveKillCount}**  
+📈 Change: **${diffKillsStr}**
+
+**💀 Deaths:**  
+First tracked: **${oldDeaths}**  
+Now: **${liveDeathCount}**  
+📉 Change: **${diffDeathsStr}**
+
+⏳ Tracked since: **${player.dateTracked}**`
+      }
+    });
+
+  } catch (err) {
+    console.error("CHECK COMMAND ERROR:", err);
+
+    return res.send({
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: { content: `❌ Error while checking progress.` }
+    });
+  }
+}
+
 
 
 export default function registerEventListeners(client) {
