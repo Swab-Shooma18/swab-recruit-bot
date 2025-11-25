@@ -10,6 +10,8 @@ import { getKillCount } from './utils/getKillCount.js';
 import {getDeathCount} from "./utils/getDeathCount.js";
 import { Client, GatewayIntentBits } from 'discord.js';
 import {getJadAndSkotizo} from "./utils/getJadAndSkotizo.js";
+import PlayerTracking from "./models/PlayerTracking.js";
+import {connectDB} from "./utils/database.js";
 
 
 const app = express();
@@ -72,6 +74,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
         const deathsValue = Number(deaths);
         let line = "";
 
+
         if (!kills || !deaths) {
           return res.send({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -108,6 +111,8 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
   }
 });
 
+
+
 export default function registerEventListeners(client) {
 
   client.on('messageCreate', async (message) => {
@@ -123,11 +128,23 @@ export default function registerEventListeners(client) {
     // Pak de Submission stats embed field
     const statsField = embed.fields.find(f => f.name === "Submission stats");
     if (!statsField) return;
+    const kills = await getKillCount(username);
+    const deaths = await getDeathCount(username);
+    const jadandskotizo = await getJadAndSkotizo(username)
+    const killsValue = Number(kills.kills);
+    const deathsValue = Number(deaths);
 
     // Haal Discord user ID
     const idMatch = statsField.value.match(/User: <@(\d+)>/);
     if (!idMatch) return;
     const discordUserId = idMatch[1];
+
+// opslaan in database
+    await PlayerTracking.create(stats);
+
+    console.log("💾 Saved tracking to DB:", stats);
+
+
 
     try {
       // Haal member op en pak nickname
@@ -142,6 +159,20 @@ export default function registerEventListeners(client) {
 
 
       console.log("Accepted username:", discordUsername);
+
+      const stats = {
+        username: discordUsername,
+        kills: kills.kills,
+        deaths: deaths,
+        elo: kills.elo,
+        jadKills: jadandskotizo.jad,
+        skotizoKills: jadandskotizo.jad,
+        approver: approverUsername
+      };
+
+      await PlayerTracking.create(stats);
+
+      console.log("💾 Saved tracking to DB:", stats);
 
       // Lookup kills & deaths
       const kills = await getKillCount(discordUsername);
@@ -179,6 +210,8 @@ Found ${discordUsername} on the Roat pkz highscores! ✅
     }
   });
 }
+
+await connectDB();
 client.login(process.env.DISCORD_TOKEN)
     .then(() => console.log('Bot logged in!'))
     .catch(err => console.error('Login failed:', err));
