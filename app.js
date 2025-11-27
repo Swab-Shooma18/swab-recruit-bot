@@ -119,7 +119,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
                     data: {
                         content:
                             `🌋 **${username} – Jad & Skotizo Kills**
-🔥 TzTok-Jad Kills: **${jad}**
+🌋 TzTok-Jad Kills: **${jad}**
 👹 Skotizo Kills: **${skotizo}**`
                     }
                 });
@@ -144,26 +144,39 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
                 if (!player) {
                     return res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        data: {content: `❌ NO TRACKING FOUND FOR **${username}**`}
+                        data: { content: `❌ NO TRACKING FOUND FOR **${username}**` }
                     });
                 }
 
                 // Live stats via highscores
                 const liveKills = await getKillCount(username);
                 const liveDeaths = await getDeathCount(username);
+                const liveJadAndSkotizo = await getJadAndSkotizo(username);
 
                 const liveKillCount = Number(liveKills.kills);
                 const liveDeathCount = Number(liveDeaths);
 
-                // old stats (first tracking)
+                // Jad / Skotizo values
+                const liveJad = Number(liveJadAndSkotizo.jad || 0);
+                const liveSkotizo = Number(liveJadAndSkotizo.skotizo || 0);
+
+                // Old tracked stats
                 const oldKills = Number(player.kills);
                 const oldDeaths = Number(player.deaths);
+                const oldJad = Number(player.jad || 0);
+                const oldSkotizo = Number(player.skotizo || 0);
 
+                // Differences
                 const diffKills = liveKillCount - oldKills;
                 const diffDeaths = liveDeathCount - oldDeaths;
+                const diffJad = liveJad - oldJad;
+                const diffSkotizo = liveSkotizo - oldSkotizo;
 
+                // Format + or - for display
                 const diffKillsStr = diffKills >= 0 ? `+${diffKills}` : `${diffKills}`;
                 const diffDeathsStr = diffDeaths >= 0 ? `+${diffDeaths}` : `${diffDeaths}`;
+                const diffJadStr = diffJad >= 0 ? `+${diffJad}` : `${diffJad}`;
+                const diffSkotizoStr = diffSkotizo >= 0 ? `+${diffSkotizo}` : `${diffSkotizo}`;
 
                 return res.send({
                     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -171,17 +184,28 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
                         content: `
 📊 **Progress check for ${username}**
 
-**🔥 Kills:**  
-First tracked: **${oldKills}**  
-Now: **${liveKillCount}**  
+🔥 **Kills:**  
+• First tracked: **${oldKills}**  
+• Now: **${liveKillCount}**  
 📈 Change: **${diffKillsStr}**
 
-**💀 Deaths:**  
-First tracked: **${oldDeaths}**  
-Now: **${liveDeathCount}**  
+💀 **Deaths:**  
+• First tracked: **${oldDeaths}**  
+• Now: **${liveDeathCount}**  
 📉 Change: **${diffDeathsStr}**
 
-⏳ Tracked since: **${player.dateTracked}**`
+🌋 **Jad kills:**  
+• First tracked: **${oldJad}**  
+• Now: **${liveJad}**  
+📈 Change: **${diffJadStr}**
+
+👹 **Skotizo kills:**  
+• First tracked: **${oldSkotizo}**  
+• Now: **${liveSkotizo}**  
+📈 Change: **${diffSkotizoStr}**
+
+⏳ **Tracked since:** ${player.dateTracked}
+                `
                     }
                 });
 
@@ -190,7 +214,7 @@ Now: **${liveDeathCount}**
 
                 return res.send({
                     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: {content: `❌ Error while checking progress.`}
+                    data: { content: `❌ Error while checking progress.` }
                 });
             }
         }
