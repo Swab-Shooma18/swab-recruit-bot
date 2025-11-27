@@ -49,7 +49,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
                 if (exists) {
                     return res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        data: { content: `⚠️ **${username}** staat al in de database!` }
+                        data: { content: `⚠️ **${username}** already added!` }
                     });
                 }
 
@@ -61,7 +61,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
                 if (!kills || !deaths) {
                     return res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        data: { content: `❌ Kan speler niet vinden (**${username}**)` }
+                        data: { content: `❌ USERNAME (**${username}**) NOT FOUND ON THE ROAT PKZ HIGHSCORES!` }
                     });
                 }
 
