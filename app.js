@@ -36,6 +36,78 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
         const {name, options} = data;
 
 
+
+        if (name.toLowerCase() === 'add') {
+            const username = options[0].value;
+
+            try {
+                // Check if already tracked
+                const exists = await PlayerTracking.findOne({
+                    username: { $regex: `^${username}$`, $options: 'i' }
+                });
+
+                if (exists) {
+                    return res.send({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: { content: `⚠️ **${username}** staat al in de database!` }
+                    });
+                }
+
+                // Fetch live stats
+                const kills = await getKillCount(username);
+                const deaths = await getDeathCount(username);
+                const jadAndSkotizo = await getJadAndSkotizo(username);
+
+                if (!kills || !deaths) {
+                    return res.send({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: { content: `❌ Kan speler niet vinden (**${username}**)` }
+                    });
+                }
+
+                const today = new Date().toISOString().split("T")[0];
+
+                const stats = {
+                    username,
+                    kills: kills.kills,
+                    deaths,
+                    elo: kills.elo,
+                    jadKills: jadAndSkotizo.jad,
+                    skotizoKills: jadAndSkotizo.skotizo,
+                    approver: "Manual command",
+                    date: today
+                };
+
+                await PlayerTracking.create(stats);
+
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: {
+                        content: `
+\`\`\`
+✅ **${username} added to the database!(Started tracking from this day: (*${today}*)**
+\`\`\`
+📊 **Stats today:**  
+🔥 Kills: **${kills.kills}**  
+💀 Deaths: **${deaths}**  
+🏆 Elo: **${kills.elo}**  
+🌋 Jad kills: **${jadAndSkotizo.jad}**  
+👹 Skotizo kills: **${jadAndSkotizo.skotizo}**
+                `
+                    }
+                });
+
+            } catch (err) {
+                console.error("ADD COMMAND ERROR:", err);
+
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: `❌ ERROR WHILE SAVING PLEASE WAIT 2 MINUTES.` }
+                });
+            }
+        }
+
+
         if (name === 'jadandskotizo') {
             const username = options[0].value;
 
@@ -249,6 +321,8 @@ Found ${discordUsername} on the Roat pkz highscores! ✅
         }
     });
 }
+
+
 
 await connectDB();
 client.login(process.env.DISCORD_TOKEN)

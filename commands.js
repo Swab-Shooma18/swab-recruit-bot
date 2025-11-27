@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { getRPSChoices } from './game.js';
 import { capitalize, InstallGlobalCommands } from './utils.js';
-
 // Get the game choices from game.js
 function createCommandChoices() {
   const choices = getRPSChoices();
@@ -92,7 +91,21 @@ const JAD_SKOTIZO_COMMAND = {
   contexts: [0, 1, 2],
 };
 
+const ADD_COMMAND = {
+  name: 'add',
+  description: 'Add a player manually to the tracking database.',
+  options: [
+    {
+      type: 3, // STRING
+      name: "username",
+      description: "RoatPkz username",
+      required: true,
+    }
+  ],
+  type: 1,
+};
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND];
+
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
