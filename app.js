@@ -417,5 +417,5 @@ await connectDB();
 client.login(process.env.DISCORD_TOKEN)
     .then(() => console.log('Bot logged in!'))
     .catch(err => console.error('Login failed:', err));
-
+registerEventListeners(client);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
