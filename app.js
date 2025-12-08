@@ -45,6 +45,76 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
     if (type !== InteractionType.APPLICATION_COMMAND) return res.status(400).json({ error: 'Unknown interaction type' });
 
     const { name, options } = data;
+
+    if (name.toLowerCase() === 'add') {
+        const username = options[0].value;
+
+        try {
+            // Check if already tracked
+            const exists = await PlayerTracking.findOne({
+                username: { $regex: `^${username}$`, $options: 'i' }
+            });
+
+            if (exists) {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: `⚠️ **${username}** already added!` }
+                });
+            }
+
+            // Fetch live stats
+            const kills = await getKillCount(username);
+            const deaths = await getDeathCount(username);
+            const jadAndSkotizo = await getJadAndSkotizo(username);
+
+            if (!kills || !deaths) {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: `❌ USERNAME (**${username}**) NOT FOUND ON THE ROAT PKZ HIGHSCORES!` }
+                });
+            }
+
+            const today = new Date().toISOString().split("T")[0];
+
+            const stats = {
+                username,
+                kills: kills.kills,
+                deaths,
+                elo: kills.elo,
+                jadKills: jadAndSkotizo.jad,
+                skotizoKills: jadAndSkotizo.skotizo,
+                approver: "Manual command",
+                date: today
+            };
+
+            await PlayerTracking.create(stats);
+
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: {
+                    content: `
+\`\`\`
+✅ **${username} added to the database!(Started tracking from this day: (*${today}*)**
+\`\`\`
+📊 **Stats today:**  
+🔥 Kills: **${kills.kills}**  
+💀 Deaths: **${deaths}**  
+🏆 Elo: **${kills.elo}**  
+🌋 Jad kills: **${jadAndSkotizo.jad}**  
+👹 Skotizo kills: **${jadAndSkotizo.skotizo}**
+                `
+                }
+            });
+
+        } catch (err) {
+            console.error("ADD COMMAND ERROR:", err);
+
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: `❌ ERROR WHILE SAVING PLEASE WAIT 2 MINUTES.` }
+            });
+        }
+    }
     if (name.toLowerCase() !== 'player') return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: { content: `❌ Unknown command: ${name}` }
@@ -132,6 +202,81 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
         data: response
     });
 });
+
+export default function registerEventListeners(client) {
+
+    client.on('messageCreate', async (message) => {
+        if (message.channelId !== process.env.ACCEPT_CHANNEL_ID) return;
+        if (!message.author.bot) return;
+        if (!message.embeds?.length) return;
+
+        const embed = message.embeds[0];
+        const title = embed.title;
+        if (!title || !title.includes('Application Submitted')) return;
+
+        const statsField = embed.fields.find(f => f.name === "Submission stats");
+        if (!statsField) return;
+
+        // --- EXTRACT DISCORD USER ID ---
+        const idMatch = statsField.value.match(/User: <@(\d+)>/);
+        if (!idMatch) return;
+        const discordUserId = idMatch[1];
+
+        try {
+            const guild = await client.guilds.fetch(message.guildId);
+            const member = await guild.members.fetch(discordUserId);
+            const discordUsername = member.displayName;
+
+            // --- APPROVER ---
+            const approverMatch = message.content.match(/by\s+@?([^\s]+)/);
+            const approverUsername = approverMatch ? approverMatch[1] : "unknown";
+
+            const dateToday = new Date().toISOString().split("T")[0];
+
+            // --- GET STATS NOW THAT WE KNOW THE USERNAME ---
+            const kills = await getKillCount(discordUsername);
+            const deaths = await getDeathCount(discordUsername);
+            const jadAndSkotizo = await getJadAndSkotizo(discordUsername);
+
+            const killsValue = Number(kills.kills);
+            const deathsValue = Number(deaths);
+
+            let line = killsValue < deathsValue ? "❌ NEGATIVE KDR" : "✅ POSITIVE KDR";
+
+            // --- BUILD OBJECT FOR DATABASE ---
+            const stats = {
+                username: discordUsername,
+                kills: kills.kills,
+                deaths: deaths,
+                elo: kills.elo,
+                jadKills: jadAndSkotizo.jad,
+                skotizoKills: jadAndSkotizo.skotizo,
+                approver: approverUsername,
+                date: dateToday
+            };
+
+            await PlayerTracking.create(stats);
+            console.log("💾 Saved tracking to DB:", stats);
+
+            // --- SEND MESSAGE TO RECRUIT CHANNEL ---
+            const recruitChannel = await client.channels.fetch(process.env.RECRUIT_CHANNEL_ID);
+            if (!recruitChannel) return console.log("❌ Recruit channel not found");
+
+            recruitChannel.send(`
+\`\`\`
+Found ${discordUsername} on the Roat pkz highscores! ✅
+\`\`\`
+🔍 **First** tracking of **${discordUsername}** on **${dateToday}**
+🔥 has **${kills.kills}** kills and **${deaths}** deaths | Elo: **${kills.elo}** (*${line}*)
+ℹ️ Easy **lookup** **#first${discordUsername}**
+📅 *TRACKED/ACCEPTED* BY ${approverUsername}
+      `);
+
+        } catch (err) {
+            console.error("Error processing accepted application:", err);
+        }
+    });
+}
 
 // ========================
 // Start bot & server
