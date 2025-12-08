@@ -74,7 +74,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
     try {
         const resAPI = await got(`https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(username)}`, {
             headers: { 'x-api-key': process.env.ROAT_API_KEY },
-            timeout: 5000,
+            timeout: { request: 5000 },
             responseType: 'json'
         });
         playerData = resAPI.body;
