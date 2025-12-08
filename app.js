@@ -8,6 +8,7 @@ import {
 import { Client, GatewayIntentBits } from 'discord.js';
 import got from 'got';
 import PlayerTracking from "./models/PlayerTracking.js";
+import {connectDB} from "./utils/database.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -282,6 +283,8 @@ Found ${discordUsername} on the Roat pkz highscores! ✅
 // ========================
 // Start bot & server
 // ========================
+
+await connectDB();
 client.login(process.env.DISCORD_TOKEN)
     .then(() => console.log('Bot logged in!'))
     .catch(err => console.error('Login failed:', err));
