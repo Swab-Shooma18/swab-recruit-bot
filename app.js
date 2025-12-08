@@ -9,6 +9,9 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import got from 'got';
 import PlayerTracking from "./models/PlayerTracking.js";
 import {connectDB} from "./utils/database.js";
+import {getKillCount} from "./utils/getKillCount.js";
+import {getDeathCount} from "./utils/getDeathCount.js";
+import {getJadAndSkotizo} from "./utils/getJadAndSkotizo.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
