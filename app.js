@@ -286,5 +286,3 @@ client.login(process.env.DISCORD_TOKEN)
     .catch(err => console.error('Login failed:', err));
 
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-
-export default client;
