@@ -290,7 +290,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
         console.error('Error fetching player:', err.message);
         return res.send({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: { content: `❌ Could not fetch player **${username}**. Probeer later opnieuw.` }
+            data: { content: `❌ Could not fetch player **${username}**. Try again later.` }
         });
     }
 
