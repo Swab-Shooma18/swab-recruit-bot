@@ -7,6 +7,7 @@ import {
 } from 'discord-interactions';
 import { Client, GatewayIntentBits } from 'discord.js';
 import got from 'got';
+import PlayerTracking from "./models/PlayerTracking.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
