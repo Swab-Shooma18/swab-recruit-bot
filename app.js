@@ -18,34 +18,39 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
 // ========================
-// Helper: Send followup safely
+// Helper: Send followup safely (handles rate limits)
 // ========================
 async function sendFollowup(token, body) {
     try {
-        await axios.post(
-            `https://discord.com/api/v10/webhooks/${process.env.WEBHOOK_ID}/${process.env.TOKEN}`,
-            body,
-            { headers: { 'Content-Type': 'application/json' } }
-        );
-    } catch (err) {
-        // Defensive check for 429
-        if (err.response?.status === 429) {
-            const retryAfter = parseFloat(err.response.data?.retry_after);
-            if (!isNaN(retryAfter)) {
-                const waitTime = retryAfter * 1000; // convert seconds to ms
-                console.log(`Rate limited. Retrying in ${waitTime}ms`);
-                await new Promise(res => setTimeout(res, waitTime));
-                return sendFollowup(token, body);
-            } else {
-                console.warn('Rate limited but no valid retry_after. Skipping retry.');
-                return;
+        let sent = false;
+        while (!sent) {
+            try {
+                await axios.post(
+                    `https://discord.com/api/v10/webhooks/${process.env.WEBHOOK_ID}/${token}`,
+                    body,
+                    { headers: { 'Content-Type': 'application/json' } }
+                );
+                sent = true;
+            } catch (err) {
+                if (err.response?.status === 429) {
+                    const retryAfter = err.response.data?.retry_after || 1000;
+                    console.warn(`Rate limited. Retrying in ${retryAfter}ms`);
+                    await new Promise(r => setTimeout(r, retryAfter));
+                } else {
+                    throw err;
+                }
             }
         }
-        console.error('Error sending followup:', err);
+    } catch (err) {
+        console.error('Failed to send followup:', err);
     }
 }
 
@@ -55,7 +60,6 @@ async function sendFollowup(token, body) {
 app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (req, res) => {
     const { type, data } = req.body;
 
-    // Ping
     if (type === InteractionType.PING) {
         return res.send({ type: InteractionResponseType.PONG });
     }
@@ -65,13 +69,24 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
     }
 
     const { name, options } = data;
-    const username = options[0]?.value;
+    const username = options?.[0]?.value;
+
+    if (!username) {
+        return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { content: '❌ Username not provided.' }
+        });
+    }
 
     try {
-        // Defer response for all commands that require API calls
+        // Always defer first
         await res.send({ type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE });
 
         switch (name.toLowerCase()) {
+
+            // ------------------------
+            // /player command
+            // ------------------------
             case 'player': {
                 const resAPI = await axios.get(
                     `https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(username)}`,
@@ -79,7 +94,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 );
 
                 const p = resAPI.data;
-                if (!p || !p.username) {
+                if (!p?.username) {
                     return await sendFollowup(data.token, { content: `❌ Player **${username}** not found!` });
                 }
 
@@ -107,11 +122,12 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 return await sendFollowup(data.token, { embeds: [embed] });
             }
 
+            // ------------------------
+            // /add command
+            // ------------------------
             case 'add': {
                 const exists = await PlayerTracking.findOne({ username: { $regex: `^${username}$`, $options: 'i' } });
-                if (exists) {
-                    return await sendFollowup(data.token, { content: `⚠️ **${username}** already added!` });
-                }
+                if (exists) return await sendFollowup(data.token, { content: `⚠️ **${username}** already added!` });
 
                 const [kills, deaths, jadAndSkotizo] = await Promise.all([
                     getKillCount(username),
@@ -124,7 +140,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 }
 
                 const today = new Date().toISOString().split('T')[0];
-                const stats = {
+                await PlayerTracking.create({
                     username,
                     kills: kills.kills,
                     deaths,
@@ -133,12 +149,10 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                     skotizoKills: jadAndSkotizo.skotizo,
                     approver: 'Manual command',
                     date: today
-                };
-
-                await PlayerTracking.create(stats);
+                });
 
                 return await sendFollowup(data.token, {
-                    content: `✅ **${username} added to the database! (Tracking from ${today})**
+                    content: `✅ **${username} added! Tracking from ${today}**
 🔥 Kills: **${kills.kills}**
 💀 Deaths: **${deaths}**
 🏆 Elo: **${kills.elo}**
@@ -147,6 +161,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 });
             }
 
+            // ------------------------
+            // /jadandskotizo command
+            // ------------------------
             case 'jadandskotizo': {
                 const { jad, skotizo } = await getJadAndSkotizo(username);
                 return await sendFollowup(data.token, {
@@ -156,6 +173,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 });
             }
 
+            // ------------------------
+            // /check command
+            // ------------------------
             case 'check': {
                 const player = await PlayerTracking.findOne({ username: { $regex: `^${username}$`, $options: 'i' } });
                 if (!player) return await sendFollowup(data.token, { content: `❌ NO TRACKING FOUND FOR **${username}**` });
@@ -182,6 +202,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 });
             }
 
+            // ------------------------
+            // /lookup command
+            // ------------------------
             case 'lookup': {
                 const [kills, deaths] = await Promise.all([getKillCount(username), getDeathCount(username)]);
                 if (!kills || !deaths) return await sendFollowup(data.token, { content: `❌ Player not found! (**${username}**)` });
