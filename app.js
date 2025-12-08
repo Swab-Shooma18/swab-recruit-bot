@@ -25,26 +25,73 @@ const client = new Client({
 // In-memory cache for /player responses
 // ========================
 const playerCache = new Map(); // key = username, value = { data, timestamp }
-const CACHE_TTL = 10 * 1000; // 10 seconds cache
+const CACHE_TTL = 30 * 1000; // 10 seconds cache
 
 // ========================
 // Helper: Send followup safely
 // ========================
 async function sendFollowup(token, body) {
+    let retry = 0;
+    const maxRetries = 5;
+
+    while (retry < maxRetries) {
+        try {
+            await axios.post(
+                `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
+                body,
+                { headers: { 'Content-Type': 'application/json' } }
+            );
+            return; // success
+        } catch (err) {
+            if (err.response?.status === 429) {
+                const retryAfter = err.response.data?.retry_after || 1000;
+                console.warn(`Rate limited. Retrying in ${retryAfter}ms`);
+                await new Promise(r => setTimeout(r, retryAfter));
+                retry++;
+            } else {
+                console.error('Error sending followup:', err);
+                return;
+            }
+        }
+    }
+
+    console.error('Max retries reached, could not send followup');
+}
+
+async function safeSendFollowup(token, body) {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+        try {
+            await axios.post(
+                `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
+                body,
+                { headers: { 'Content-Type': 'application/json' } }
+            );
+            return; // Success
+        } catch (err) {
+            if (err.response?.status === 429) {
+                const retryAfter = err.response.data?.retry_after || 1000;
+                console.warn(`Rate limited. Retrying in ${retryAfter}ms`);
+                await new Promise(r => setTimeout(r, retryAfter));
+                attempts++;
+            } else {
+                console.error('Error sending followup:', err.message);
+                return;
+            }
+        }
+    }
+
+    console.warn('Max retries reached, sending fallback message.');
     try {
         await axios.post(
             `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
-            body,
+            { content: '⚠️ Discord is druk, probeer het over een paar seconden opnieuw.' },
             { headers: { 'Content-Type': 'application/json' } }
         );
     } catch (err) {
-        if (err.response?.status === 429) {
-            const retryAfter = err.response.data?.retry_after || 1000;
-            console.warn(`Rate limited. Retrying in ${retryAfter}ms`);
-            await new Promise(r => setTimeout(r, retryAfter));
-            return sendFollowup(token, body); // retry once
-        }
-        console.error('Error sending followup:', err);
+        console.error('Fallback failed:', err.message);
     }
 }
 
@@ -74,46 +121,51 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 // Check cache first
                 const cached = playerCache.get(username);
                 if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-                    return await sendFollowup(data.token, cached.data);
+                    return await safeSendFollowup(data.token, cached.data);
                 }
 
-                const resAPI = await axios.get(
-                    `https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(username)}`,
-                    { headers: { 'x-api-key': process.env.ROAT_API_KEY }, timeout: 5000 }
-                );
+                let playerData;
+                try {
+                    const resAPI = await axios.get(
+                        `https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(username)}`,
+                        { headers: { 'x-api-key': process.env.ROAT_API_KEY }, timeout: 5000 }
+                    );
 
-                const p = resAPI.data;
-                if (!p || !p.username) {
-                    const notFound = { content: `❌ Player **${username}** not found!` };
-                    return await sendFollowup(data.token, notFound);
+                    playerData = resAPI.data;
+                    if (!playerData || !playerData.username) {
+                        const notFound = { content: `❌ Player **${username}** not found!` };
+                        return await safeSendFollowup(data.token, notFound);
+                    }
+                } catch (err) {
+                    console.error('Error fetching player:', err.message);
+                    return await safeSendFollowup(data.token, { content: `❌ Could not fetch player **${username}**. Try again later.` });
                 }
 
-                const kd = p.deaths === 0 ? p.kills : (p.kills / p.deaths).toFixed(2);
+                const kd = playerData.deaths === 0 ? playerData.kills : (playerData.kills / playerData.deaths).toFixed(2);
 
                 const embed = {
                     type: 'rich',
-                    title: `📄 Player Lookup: ${p.display_name || p.username}`,
+                    title: `📄 Player Lookup: ${playerData.display_name || playerData.username}`,
                     color: 0xffcc00,
                     fields: [
-                        { name: '⚔️ Kills', value: `${p.kills}`, inline: true },
-                        { name: '💀 Deaths', value: `${p.deaths}`, inline: true },
+                        { name: '⚔️ Kills', value: `${playerData.kills}`, inline: true },
+                        { name: '💀 Deaths', value: `${playerData.deaths}`, inline: true },
                         { name: '📊 K/D', value: `${kd}`, inline: true },
-                        { name: '🎮 Game Mode', value: p.game_mode || 'Unknown', inline: true },
-                        { name: '⭐ Rank', value: p.player_rank || 'None', inline: true },
-                        { name: '💎 Donator', value: p.donator_rank || 'None', inline: true },
-                        { name: '🔥 ELO', value: `${p.elo}`, inline: true },
-                        { name: '🏰 Clan Rank', value: p.clan_info?.rankName || 'None', inline: true },
-                        { name: '🕒 Last Seen', value: p.last_seen || 'Unknown', inline: false }
+                        { name: '🎮 Game Mode', value: playerData.game_mode || 'Unknown', inline: true },
+                        { name: '⭐ Rank', value: playerData.player_rank || 'None', inline: true },
+                        { name: '💎 Donator', value: playerData.donator_rank || 'None', inline: true },
+                        { name: '🔥 ELO', value: `${playerData.elo}`, inline: true },
+                        { name: '🏰 Clan Rank', value: playerData.clan_info?.rankName || 'None', inline: true },
+                        { name: '🕒 Last Seen', value: playerData.last_seen || 'Unknown', inline: false }
                     ],
                     timestamp: new Date().toISOString(),
                     footer: { text: 'RoatPkz API • Clan: Swab' }
                 };
 
                 const response = { embeds: [embed] };
-                // Cache response
                 playerCache.set(username, { data: response, timestamp: Date.now() });
 
-                return await sendFollowup(data.token, response);
+                return await safeSendFollowup(data.token, response);
             }
 
             // ====================
