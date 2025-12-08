@@ -24,6 +24,15 @@ const client = new Client({
 const playerCache = new Map(); // key = username, value = { data, timestamp }
 const CACHE_TTL = 30 * 1000; // 30 seconden
 
+
+const DONATOR_RANKS = {
+    0: 'No',
+    1: 'Normal',
+    2: 'Super',
+    3: 'Extreme',
+    4: 'Legendary',
+    5: 'Royal'
+};
 // ========================
 // Interaction endpoint
 // ========================
@@ -94,15 +103,19 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
             { name: '⚔️ Kills', value: `${playerData.kills}`, inline: true },
             { name: '💀 Deaths', value: `${playerData.deaths}`, inline: true },
             { name: '📊 K/D', value: `${kd}`, inline: true },
-            { name: '🎮 Game Mode', value: playerData.game_mode || 'Unknown', inline: true },
-            { name: '⭐ Rank', value: playerData.player_rank || 'None', inline: true },
-            { name: '💎 Donator', value: playerData.donator_rank || 'None', inline: true },
             { name: '🔥 ELO', value: `${playerData.elo}`, inline: true },
             { name: '🏰 Clan Rank', value: playerData.clan_info?.rankName || 'None', inline: true },
+            {
+                name: '💎 Donator',
+                value: DONATOR_RANKS[playerData.donator_rank] || 'None',
+                inline: true
+            },
+            { name: '🌋 Jad' , value: playerData.jad ,inline: true},
+            { name: '👹 Skotizo' , value: playerData.skotizo ,inline: true},
             { name: '🕒 Last Seen', value: playerData.last_seen || 'Unknown', inline: false }
         ],
         timestamp: new Date().toISOString(),
-        footer: { text: 'RoatPkz API • Clan: Swab' }
+        footer: { text: 'Roat Pkz API • Clan: Swab' }
     };
 
     const response = { embeds: [embed] };
