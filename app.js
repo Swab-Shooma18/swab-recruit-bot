@@ -33,7 +33,7 @@ const CACHE_TTL = 10 * 1000; // 10 seconds cache
 async function sendFollowup(token, body) {
     try {
         await axios.post(
-            `https://discord.com/api/v10/webhooks/${process.env.APP_ID}/${token}`,
+            `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
             body,
             { headers: { 'Content-Type': 'application/json' } }
         );
