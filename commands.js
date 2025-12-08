@@ -105,7 +105,21 @@ const ADD_COMMAND = {
   type: 1,
 };
 
+const PLAYER_COMMAND = {
+  name: 'player',
+  description: 'Shows all player information',
+  options: [
+    {
+      type: 3, // STRING
+      name: "username",
+      description: "RoatPkz username",
+      required: true,
+    }
+  ],
+  type: 1,
+};
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND];
+
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
