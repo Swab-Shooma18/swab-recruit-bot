@@ -27,7 +27,7 @@ const client = new Client({
 async function sendFollowup(token, body) {
     try {
         await axios.post(
-            `https://discord.com/api/v10/webhooks/${process.env.APP_ID}/${token}`,
+            `https://discord.com/api/v10/webhooks/${process.env.APP_ID}/${process.env.TOKEN}`,
             body,
             { headers: { 'Content-Type': 'application/json' } }
         );
