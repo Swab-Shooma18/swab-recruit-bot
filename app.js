@@ -32,7 +32,7 @@ async function sendFollowup(token, body) {
             { headers: { 'Content-Type': 'application/json' } }
         );
     } catch (err) {
-        console.error('Error sending followup:', err);
+        console.error('Error sending sfollowup:', err);
     }
 }
 
