@@ -31,31 +31,21 @@ const CACHE_TTL = 10 * 1000; // 10 seconds cache
 // Helper: Send followup safely
 // ========================
 async function sendFollowup(token, body) {
-    const MAX_RETRIES = 3;
-    let attempts = 0;
-
-    while (attempts < MAX_RETRIES) {
-        try {
-            await axios.post(
-                `https://discord.com/api/v10/webhooks/${process.env.WEBHOOK_ID}/${process.env.TOKEN}`,
-                body,
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-            return; // success
-        } catch (err) {
-            attempts++;
-            if (err.response?.status === 429) {
-                const retryAfter = err.response.data?.retry_after || 1000;
-                console.warn(`Rate limited. Retrying in ${retryAfter}ms (Attempt ${attempts}/${MAX_RETRIES})`);
-                await new Promise(r => setTimeout(r, retryAfter));
-            } else {
-                console.error('Error sending followup:', err);
-                return;
-            }
+    try {
+        await axios.post(
+            `https://discord.com/api/v10/webhooks/${process.env.APPLICATION_ID}/${token}`,
+            body,
+            { headers: { 'Content-Type': 'application/json' } }
+        );
+    } catch (err) {
+        if (err.response?.status === 429) {
+            const retryAfter = err.response.data?.retry_after || 1000;
+            console.warn(`Rate limited. Retrying in ${retryAfter}ms`);
+            await new Promise(r => setTimeout(r, retryAfter));
+            return sendFollowup(token, body); // retry once
         }
+        console.error('Error sending followup:', err);
     }
-
-    console.error('Failed to send followup after max retries.');
 }
 
 // ========================
