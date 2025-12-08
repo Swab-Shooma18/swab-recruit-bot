@@ -32,11 +32,18 @@ async function sendFollowup(token, body) {
             { headers: { 'Content-Type': 'application/json' } }
         );
     } catch (err) {
+        // Defensive check for 429
         if (err.response?.status === 429) {
-            const retryAfter = err.response.data.retry_after * 1000;
-            console.log(`Rate limited. Retrying in ${retryAfter}ms`);
-            await new Promise(res => setTimeout(res, retryAfter));
-            return sendFollowup(token, body);
+            const retryAfter = parseFloat(err.response.data?.retry_after);
+            if (!isNaN(retryAfter)) {
+                const waitTime = retryAfter * 1000; // convert seconds to ms
+                console.log(`Rate limited. Retrying in ${waitTime}ms`);
+                await new Promise(res => setTimeout(res, waitTime));
+                return sendFollowup(token, body);
+            } else {
+                console.warn('Rate limited but no valid retry_after. Skipping retry.');
+                return;
+            }
         }
         console.error('Error sending followup:', err);
     }
