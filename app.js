@@ -121,7 +121,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 // Check cache first
                 const cached = playerCache.get(username);
                 if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-                    return await safeSendFollowup(data.token, cached.data);
+                    return await sendFollowupSafe(data.token, cached.data);
                 }
 
                 let playerData;
@@ -132,15 +132,17 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                     );
 
                     playerData = resAPI.data;
+
                     if (!playerData || !playerData.username) {
                         const notFound = { content: `❌ Player **${username}** not found!` };
-                        return await safeSendFollowup(data.token, notFound);
+                        return await sendFollowupSafe(data.token, notFound);
                     }
                 } catch (err) {
                     console.error('Error fetching player:', err.message);
-                    return await safeSendFollowup(data.token, { content: `❌ Could not fetch player **${username}**. Try again later.` });
+                    return await sendFollowupSafe(data.token, { content: `❌ Could not fetch player **${username}**. Probeer het later opnieuw.` });
                 }
 
+                // Bereken K/D
                 const kd = playerData.deaths === 0 ? playerData.kills : (playerData.kills / playerData.deaths).toFixed(2);
 
                 const embed = {
@@ -163,6 +165,8 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 };
 
                 const response = { embeds: [embed] };
+
+                // Cache response langer (30s)
                 playerCache.set(username, { data: response, timestamp: Date.now() });
 
                 return await safeSendFollowup(data.token, response);
