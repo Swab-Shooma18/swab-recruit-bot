@@ -58,40 +58,28 @@ async function sendFollowup(token, body) {
     console.error('Max retries reached, could not send followup');
 }
 
-async function safeSendFollowup(token, body) {
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    while (attempts < maxAttempts) {
-        try {
-            await axios.post(
-                `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
-                body,
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-            return; // Success
-        } catch (err) {
-            if (err.response?.status === 429) {
-                const retryAfter = err.response.data?.retry_after || 1000;
-                console.warn(`Rate limited. Retrying in ${retryAfter}ms`);
-                await new Promise(r => setTimeout(r, retryAfter));
-                attempts++;
-            } else {
-                console.error('Error sending followup:', err.message);
-                return;
-            }
-        }
-    }
-
-    console.warn('Max retries reached, sending fallback message.');
+async function sendFollowupSafe(token, body) {
     try {
         await axios.post(
             `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
-            { content: '⚠️ Discord is druk, probeer het over een paar seconden opnieuw.' },
+            body,
             { headers: { 'Content-Type': 'application/json' } }
         );
     } catch (err) {
-        console.error('Fallback failed:', err.message);
+        if (err.response?.status === 429) {
+            console.warn('Rate limited, sending fallback message instead of retry');
+            try {
+                await axios.post(
+                    `https://discord.com/api/v10/webhooks/1440742998966272142/${token}`,
+                    { content: '⚠️ Discord is druk. Probeer het over een paar seconden opnieuw.' },
+                    { headers: { 'Content-Type': 'application/json' } }
+                );
+            } catch (e) {
+                console.error('Fallback message failed:', e.message);
+            }
+        } else {
+            console.error('Error sending followup:', err.message);
+        }
     }
 }
 
