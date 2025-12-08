@@ -6,7 +6,7 @@ import {
     verifyKeyMiddleware,
 } from 'discord-interactions';
 import { Client, GatewayIntentBits } from 'discord.js';
-import axios from 'axios';
+import got from 'got';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,7 +24,7 @@ const client = new Client({
 const playerCache = new Map(); // key = username, value = { data, timestamp }
 const CACHE_TTL = 30 * 1000; // 30 seconden
 
-
+// Donator rank mapping
 const DONATOR_RANKS = {
     0: 'No',
     1: 'Normal',
@@ -33,13 +33,14 @@ const DONATOR_RANKS = {
     4: 'Legendary',
     5: 'Royal'
 };
+
 // ========================
 // Interaction endpoint
 // ========================
 app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (req, res) => {
     const { type, data } = req.body;
 
-    // Ping check
+    // Ping
     if (type === InteractionType.PING) return res.send({ type: InteractionResponseType.PONG });
     if (type !== InteractionType.APPLICATION_COMMAND) return res.status(400).json({ error: 'Unknown interaction type' });
 
@@ -67,15 +68,17 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
     }
 
     // ========================
-    // Fetch player data
+    // Fetch player data with got
     // ========================
     let playerData;
     try {
-        const resAPI = await axios.get(
-            `https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(username)}`,
-            { headers: { 'x-api-key': process.env.ROAT_API_KEY }, timeout: 5000 }
-        );
-        playerData = resAPI.data;
+        const resAPI = await got(`https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(username)}`, {
+            headers: { 'x-api-key': process.env.ROAT_API_KEY },
+            timeout: 5000,
+            responseType: 'json'
+        });
+        playerData = resAPI.body;
+
         if (!playerData || !playerData.username) {
             return res.send({
                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -105,13 +108,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
             { name: '📊 K/D', value: `${kd}`, inline: true },
             { name: '🔥 ELO', value: `${playerData.elo}`, inline: true },
             { name: '🏰 Clan Rank', value: playerData.clan_info?.rankName || 'None', inline: true },
-            {
-                name: '💎 Donator',
-                value: DONATOR_RANKS[playerData.donator_rank] || 'None',
-                inline: true
-            },
-            { name: '🌋 Jad' , value: playerData.jad ,inline: true},
-            { name: '👹 Skotizo' , value: playerData.skotizo ,inline: true},
+            { name: '💎 Donator', value: DONATOR_RANKS[playerData.donator_rank] || 'None', inline: true },
+            { name: '🌋 Jad', value: playerData.jad || '0', inline: true },
+            { name: '👹 Skotizo', value: playerData.skotizo || '0', inline: true },
             { name: '🕒 Last Seen', value: playerData.last_seen || 'Unknown', inline: false }
         ],
         timestamp: new Date().toISOString(),
