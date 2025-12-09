@@ -411,15 +411,6 @@ Found ${discordUsername} on the Roat pkz highscores! ✅
     });
 }
 
-// ========================
-// Start bot & server
-// ========================
-
-await connectDB();
-client.login(process.env.DISCORD_TOKEN)
-    .then(() => console.log('Bot logged in!'))
-    .catch(err => console.error('Login failed:', err));
-registerEventListeners(client);
 function startBanWatcher(client) {
     const BAN_CHANNEL = process.env.BAN_CHANNEL_ID;
     if (!BAN_CHANNEL) return console.log("❌ No BAN_CHANNEL_ID set!");
@@ -482,6 +473,19 @@ function startBanWatcher(client) {
     }, 120000); // 2 minutes
 }
 
+// ========================
+// Start bot & server
+// ========================
+
+await connectDB();
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => console.log('Bot logged in!'))
+    .catch(err => console.error('Login failed:', err));
+client.on('ready', () => {
+    console.log(`Bot ready as ${client.user.tag}`);
+    startBanWatcher(client);
+});
+registerEventListeners(client);
 // Interval: elke 2 minuten
-setInterval(startBanWatcher, 2 * 60 * 1000);
+setInterval(startBanWatcher, 60 * 1000);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
