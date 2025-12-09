@@ -420,68 +420,50 @@ client.login(process.env.DISCORD_TOKEN)
     .then(() => console.log('Bot logged in!'))
     .catch(err => console.error('Login failed:', err));
 registerEventListeners(client);
-function startBanWatcher(client) {
-    const BAN_CHANNEL = process.env.BAN_CHANNEL_ID;
-    if (!BAN_CHANNEL) return console.log("❌ No BAN_CHANNEL_ID set!");
 
-    let lastBans = [];
+async function checkClanBans() {
+    try {
+        const res = await got("https://api.roatpkz.ps/api/v1/clan/bans", {
+            headers: { "x-api-key": process.env.ROAT_API_KEY },
+            responseType: "json",
+            timeout: { request: 5000 }
+        });
 
-    setInterval(async () => {
-        try {
-            const res = await got("https://api.roatpkz.ps/api/v1/clan/bans", {
-                responseType: "json",
-                timeout: { request: 5000 }
-            });
+        const bans = res.body;
 
-            const bans = res.body;
+        if (!Array.isArray(bans)) return;
 
-            // First run → only store the list, do NOT send messages
-            if (lastBans.length === 0) {
-                lastBans = bans;
-                console.log("📡 Ban watcher initialized.");
-                return;
-            }
-
-            const channel = await client.channels.fetch(BAN_CHANNEL);
-            if (!channel) return console.log("❌ Ban channel not found!");
-
-            // Compare to find new bans
-            const oldUsernames = new Set(lastBans.map(b => b.username));
-
-            for (const ban of bans) {
-                if (!oldUsernames.has(ban.username)) {
-
-                    // BUILD EMBED
-                    const embed = {
-                        type: 'rich',
-                        title: '🚫 New Clan Ban Detected',
-                        color: 0xff0000,
-                        fields: [
-                            { name: '👤 Username', value: ban.username, inline: true },
-                            { name: '🔨 Banned By', value: ban.bannedBy, inline: true },
-                            {
-                                name: '⏰ Banned At',
-                                value: `<t:${ban.bannedAt}:F>`,
-                                inline: false
-                            }
-                        ],
-                        footer: { text: 'Roat Pkz • Clan Ban Watcher' },
-                        timestamp: new Date().toISOString()
-                    };
-
-                    await channel.send({ embeds: [embed] });
-                    console.log(`🚫 New ban sent: ${ban.username}`);
-                }
-            }
-
+        if (lastBans.length === 0) {
             lastBans = bans;
-
-        } catch (err) {
-            console.error("Ban watcher error:", err.message);
+            return;
         }
-    }, 120000); // 2 minutes
+
+        const oldUsernames = new Set(lastBans.map(b => b.username));
+
+        const newBans = bans.filter(b => !oldUsernames.has(b.username));
+
+        if (newBans.length > 0) {
+            const channel = await client.channels.fetch(process.env.BAN_LOG_CHANNEL);
+
+            for (const ban of newBans) {
+                const date = new Date(ban.bannedAt * 1000).toLocaleString();
+
+                await channel.send(`
+🚫 **New clan ban detected!**
+**User:** ${ban.username}
+**Banned by:** ${ban.bannedBy}
+**Date:** ${date}
+                `);
+            }
+        }
+
+        lastBans = bans;
+
+    } catch (err) {
+        console.error("❌ Error checking bans:", err.message);
+    }
 }
 
 // Interval: elke 2 minuten
-setInterval(startBanWatcher, 2 * 60 * 1000);
+setInterval(checkClanBans, 2 * 60 * 1000);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
