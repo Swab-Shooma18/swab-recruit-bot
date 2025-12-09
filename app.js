@@ -28,6 +28,8 @@ const client = new Client({
 // ========================
 const playerCache = new Map(); // key = username, value = { data, timestamp }
 const CACHE_TTL = 30 * 1000; // 30 seconden
+let lastBans = []; // cache
+
 
 // Donator rank mapping
 const DONATOR_RANKS = {
@@ -418,4 +420,49 @@ client.login(process.env.DISCORD_TOKEN)
     .then(() => console.log('Bot logged in!'))
     .catch(err => console.error('Login failed:', err));
 registerEventListeners(client);
+async function checkClanBans() {
+    try {
+        const res = await got("https://api.roatpkz.ps/api/v1/clan/bans", {
+            headers: { "x-api-key": process.env.ROAT_API_KEY },
+            responseType: "json",
+            timeout: { request: 5000 }
+        });
+
+        const bans = res.body;
+
+        if (!Array.isArray(bans)) return;
+
+        if (lastBans.length === 0) {
+            lastBans = bans;
+            return;
+        }
+
+        const oldUsernames = new Set(lastBans.map(b => b.username));
+
+        const newBans = bans.filter(b => !oldUsernames.has(b.username));
+
+        if (newBans.length > 0) {
+            const channel = await client.channels.fetch(process.env.BAN_LOG_CHANNEL);
+
+            for (const ban of newBans) {
+                const date = new Date(ban.bannedAt * 1000).toLocaleString();
+
+                await channel.send(`
+🚫 **New clan ban detected!**
+**User:** ${ban.username}
+**Banned by:** ${ban.bannedBy}
+**Date:** ${date}
+                `);
+            }
+        }
+
+        lastBans = bans;
+
+    } catch (err) {
+        console.error("❌ Error checking bans:", err.message);
+    }
+}
+
+// Interval: elke 2 minuten
+setInterval(checkClanBans, 2 * 60 * 1000);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
