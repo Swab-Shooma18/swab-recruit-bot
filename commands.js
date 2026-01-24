@@ -139,7 +139,41 @@ const CHECKVOICE_COMMAND = {
   type: 1,
 };
 
+const GIVE_BAN_RIGHTS_COMMAND = {
+  name: "givebanrights",
+  description: "Link ingame username to discord. Used for automatic ban messages.",
+  options: [
+    {
+      type: 6, // USER
+      name: "discorduser",
+      description: "Discord user to give ban rights",
+      required: true
+    },
+    {
+      type: 3, // STRING
+      name: "username",
+      description: "In-game username of the Discord user",
+      required: true
+    }
+  ],
+  type: 1
+};
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND,TESTWARFARE_COMMAND];
+const REMOVE_BAN_RIGHTS_COMMAND = {
+  name: "removebanrights",
+  description: "Remove Discord-ban rights mapping for a given in-game username.",
+  options: [
+    {
+      type: 3, // STRING
+      name: "username",
+      description: "In-game username to remove the mapping for",
+      required: true
+    }
+  ],
+  type: 1
+};
+
+
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND,TESTWARFARE_COMMAND,GIVE_BAN_RIGHTS_COMMAND,REMOVE_BAN_RIGHTS_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);

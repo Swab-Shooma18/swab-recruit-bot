@@ -14,6 +14,7 @@ import {getDeathCount} from "./utils/getDeathCount.js";
 import {getJadAndSkotizo} from "./utils/getJadAndSkotizo.js";
 import VoiceTracking from "./models/voiceTracking.js";
 import { getWeekKey } from "./utils/getWeekKey.js";
+import BanRights from "./utils/banRights.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -299,6 +300,53 @@ Total Kills: **${latest.totalKills}**
         });
     }
 
+    if (name === "givebanrights") {
+        const discordUserId = options[0].value;
+        const inGameName = options[1].value;
+
+
+        try {
+            const existing = await BanRights.findOne({ discordId: discordUserId });
+            if (existing) {
+                existing.inGameName = inGameName;
+                await existing.save();
+            } else {
+                await BanRights.create({ discordId: discordUserId, inGameName });
+            }
+
+
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: `✅ <@${discordUserId}> is now linked to in-game name **${inGameName}**` }
+            });
+        } catch (err) {
+            console.error(err);
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: `❌ Could not set ban rights` }
+            });
+        }
+    }
+
+    if (name === 'removebanrights') {
+        const inGameName = options[0].value;
+
+
+        const result = await BanRights.findOneAndDelete({ inGameName });
+
+
+        if (result) {
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: `✅ Removed username mapping for **${inGameName}**` }
+            });
+        } else {
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: `⚠️ No mapping found for **${inGameName}**` }
+            });
+        }
+    }
 
     if (name.toLowerCase() === 'add') {
         const username = options[0].value;
@@ -606,10 +654,8 @@ async function checkClanBans() {
         const bans = res.body;
         if (!Array.isArray(bans) || bans.length === 0) return;
 
-
         const newBans = bans.filter(b => b.bannedAt > lastBanTimestamp);
         if (newBans.length === 0) return;
-
 
         lastBanTimestamp = Math.max(...newBans.map(b => b.bannedAt));
 
@@ -617,18 +663,19 @@ async function checkClanBans() {
         const channel = await client.channels.fetch(process.env.BAN_CHANNEL);
         if (!channel) return console.log("❌ Ban channel not found");
 
+        const banEntries = await Promise.all(
+            newBans.slice(0, 10).map(async (ban) => {
+                const mod = await BanRights.findOne({ inGameName: ban.bannedBy });
+                const modLine = mod ? `<@${mod.discordId}> (IG: ${ban.bannedBy})` : ban.bannedBy;
+                return `**${ban.username}**\n🔨 Banned by: ${modLine}\n🕒 <t:${ban.bannedAt}:R>`;
+            })
+        );
+
 
         const embed = {
             color: 0xe74c3c,
             title: `🚫 ${newBans.length} New Clan Ban(s)`,
-            description: newBans
-                .slice(0, 10)
-                .map(ban =>
-                    `**${ban.username}**
-🔨 Banned by: **${ban.bannedBy || 'Unknown'}**
-🕒 <t:${ban.bannedAt}:R>`
-                )
-                .join('\n\n'),
+            description: banEntries.join('\n\n'),
             footer: {
                 text: newBans.length > 10
                     ? `Showing 10 of ${newBans.length} bans`
@@ -638,9 +685,8 @@ async function checkClanBans() {
         };
 
 
-        await channel.send({
-            embeds: [embed]
-        });
+        await channel.send({ embeds: [embed] });
+
 
     } catch (err) {
         console.error("❌ Error checking clan bans:", err.message);
