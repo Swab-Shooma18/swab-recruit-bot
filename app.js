@@ -388,37 +388,66 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
 });
 
 export default function registerEventListeners(client) {
-    client.on("voiceStateUpdate", async (oldState, newState) => {
-        if (oldState.channelId === newState.channelId) return;
+    client.on('voiceStateUpdate', async (oldState, newState) => {
+        try {
+            const IGNORED_VOICE_CHANNELS = [
+                "1117364519702904873"
+            ];
+            const userId = newState.id;
+            const guildId = newState.guild.id;
+
+            const oldChannel = oldState.channelId;
+            const newChannel = newState.channelId;
 
 
-        const userId = newState.id;
-        const guildId = newState.guild.id;
-        const now = Date.now();
-        const weekKey = getWeekKey();
+            if (IGNORED_VOICE_CHANNELS.includes(oldChannel) && IGNORED_VOICE_CHANNELS.includes(newChannel)) return;
+
+            if (!oldChannel && newChannel && !IGNORED_VOICE_CHANNELS.includes(newChannel)) {
+                await VoiceTracking.findOneAndUpdate(
+                    { userId, guildId },
+                    { joinedAt: Date.now() },
+                    { upsert: true }
+                );
+            }
+
+            if (oldChannel && !newChannel && !IGNORED_VOICE_CHANNELS.includes(oldChannel)) {
+                const record = await VoiceTracking.findOne({ userId, guildId });
+                if (record?.joinedAt) {
+                    const timeSpent = Date.now() - record.joinedAt;
+
+                    const weekKey = getWeekKey();
+                    const current = record.weekly.get(weekKey) || 0;
+                    record.weekly.set(weekKey, current + timeSpent);
+                    record.joinedAt = null;
+                    await record.save();
+                }
+            }
 
 
-        let doc = await VoiceTracking.findOne({ userId, guildId });
-        if (!doc) {
-            doc = await VoiceTracking.create({ userId, guildId });
-        }
-
-        if (!oldState.channelId && newState.channelId) {
-            doc.joinedAt = now;
-            await doc.save();
-        }
-        if (oldState.channelId && !newState.channelId && doc.joinedAt) {
-            const duration = now - doc.joinedAt;
-
-
-            doc.weekly.set(
-                weekKey,
-                (doc.weekly.get(weekKey) || 0) + duration
-            );
+            if (oldChannel && newChannel && oldChannel !== newChannel) {
+                if (!IGNORED_VOICE_CHANNELS.includes(oldChannel)) {
+                    const record = await VoiceTracking.findOne({ userId, guildId });
+                    if (record?.joinedAt) {
+                        const timeSpent = Date.now() - record.joinedAt;
+                        const weekKey = getWeekKey();
+                        const current = record.weekly.get(weekKey) || 0;
+                        record.weekly.set(weekKey, current + timeSpent);
+                    }
+                }
 
 
-            doc.joinedAt = null;
-            await doc.save();
+                if (!IGNORED_VOICE_CHANNELS.includes(newChannel)) {
+                    await VoiceTracking.findOneAndUpdate(
+                        { userId, guildId },
+                        { joinedAt: Date.now() },
+                        { upsert: true }
+                    );
+                }
+            }
+
+
+        } catch (err) {
+            console.error("❌ Voice tracking error:", err);
         }
     });
 
