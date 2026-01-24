@@ -119,6 +119,12 @@ const PLAYER_COMMAND = {
   type: 1,
 };
 
+const TESTWARFARE_COMMAND = {
+  name: 'testwarfare',
+  description: 'Send a test message with the latest clan warfare result',
+  type: 1,
+};
+
 const CHECKVOICE_COMMAND = {
   name: 'checkvoice',
   description: 'Check how much time a user spent in voice this week',
@@ -134,6 +140,6 @@ const CHECKVOICE_COMMAND = {
 };
 
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND];
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND,TESTWARFARE_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
