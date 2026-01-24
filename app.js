@@ -205,7 +205,13 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
         }
 
 
-        const ms = data.weekly.get(weekKey) || 0;
+        let ms = data.weekly.get(weekKey) || 0;
+
+        if (data.joinedAt) {
+            ms += Date.now() - data.joinedAt;
+        }
+
+
         const minutes = Math.floor(ms / 60000);
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = minutes % 60;
@@ -216,7 +222,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
             data: {
                 embeds: [{
                     color: 0x5865F2,
-                    title: "🎧 Voice Activity",
+                    title: "🎧 Voice Activity (beta)",
                     description: `<@${user}> has spent **${hours}h ${remainingMinutes}m** in voice **this week**.`,
                     footer: { text: `Week: ${weekKey}` }
                 }]
