@@ -299,57 +299,6 @@ Total Kills: **${latest.totalKills}**
         });
     }
 
-    if (name === "testwarfare") {
-        try {
-// Haal het nieuwste clan warfare event
-            const res = await got('https://api.roatpkz.ps/api/v1/events/clan-warfare', {
-                headers: { 'x-api-key': process.env.ROAT_API_KEY },
-                responseType: 'json',
-                timeout: { request: 5000 }
-            });
-
-
-            const data = res.body;
-            if (!data.content || data.content.length === 0) {
-                return res.send({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: "❌ Geen warfare events gevonden." }
-                });
-            }
-
-
-            const latest = data.content[0];
-
-
-// Stuur het bericht naar het gewenste kanaal
-            const channel = await client.channels.fetch(process.env.WARFARE_CHANNEL);
-            if (!channel) return console.log("❌ Channel not found");
-
-
-            await channel.send(`
-🏆 **Latest Clan Warfare Result**
-Winner: **${latest.winnerClan}**
-Winner Kills: ${latest.winnerKills}
-Total Clans: ${latest.totalClans}
-Total Kills: ${latest.totalKills}
-Time Ago: ${latest.timeAgo}
-`);
-
-
-            return res.send({
-                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { content: "✅ Test warfare message sent using the latest API event!" }
-            });
-
-
-        } catch (err) {
-            console.error("❌ Error sending test warfare message:", err.message);
-            return res.send({
-                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { content: `❌ Error: ${err.message}` }
-            });
-        }
-    }
 
     if (name.toLowerCase() === 'add') {
         const username = options[0].value;
@@ -643,7 +592,60 @@ registerEventListeners(client);
 
 
 let lastWarfareId = null;
+let lastBanTimestamp = 0;
 
+async function checkClanBans() {
+    try {
+        const res = await got('https://api.roatpkz.ps/api/v1/clan/bans', {
+            headers: { 'x-api-key': process.env.ROAT_API_KEY },
+            responseType: 'json',
+            timeout: { request: 5000 }
+        });
+
+
+        const bans = res.body;
+        if (!Array.isArray(bans) || bans.length === 0) return;
+
+
+        const newBans = bans.filter(b => b.bannedAt > lastBanTimestamp);
+        if (newBans.length === 0) return;
+
+
+        lastBanTimestamp = Math.max(...newBans.map(b => b.bannedAt));
+
+
+        const channel = await client.channels.fetch(process.env.BAN_CHANNEL);
+        if (!channel) return console.log("❌ Ban channel not found");
+
+
+        const embed = {
+            color: 0xe74c3c,
+            title: `🚫 ${newBans.length} New Clan Ban(s)`,
+            description: newBans
+                .slice(0, 10)
+                .map(ban =>
+                    `**${ban.username}**
+🔨 Banned by: **${ban.bannedBy || 'Unknown'}**
+🕒 <t:${ban.bannedAt}:R>`
+                )
+                .join('\n\n'),
+            footer: {
+                text: newBans.length > 10
+                    ? `Showing 10 of ${newBans.length} bans`
+                    : 'Clan Moderation'
+            },
+            timestamp: new Date(lastBanTimestamp * 1000).toISOString()
+        };
+
+
+        await channel.send({
+            embeds: [embed]
+        });
+
+    } catch (err) {
+        console.error("❌ Error checking clan bans:", err.message);
+    }
+}
 
 async function checkClanWarfare() {
     try {
@@ -715,51 +717,8 @@ Total Kills: **${latest.totalKills}**
     }
 }
 
-async function checkClanBans() {
-    try {
-        const res = await got("https://api.roatpkz.ps/api/v1/clan/bans", {
-            headers: { "x-api-key": process.env.ROAT_API_KEY },
-            responseType: "json",
-            timeout: { request: 5000 }
-        });
-
-        const bans = res.body;
-
-        if (!Array.isArray(bans)) return;
-
-        if (lastBans.length === 0) {
-            lastBans = bans;
-            return;
-        }
-
-        const oldUsernames = new Set(lastBans.map(b => b.username));
-
-        const newBans = bans.filter(b => !oldUsernames.has(b.username));
-
-        if (newBans.length > 0) {
-            const channel = await client.channels.fetch(process.env.BAN_LOG_CHANNEL);
-
-            for (const ban of newBans) {
-                const date = new Date(ban.bannedAt * 1000).toLocaleString();
-
-                await channel.send(`
-🚫 **New clan ban detected!**
-**User:** ${ban.username}
-**Banned by:** ${ban.bannedBy}
-**Date:** ${date}
-                `);
-            }
-        }
-
-        lastBans = bans;
-
-    } catch (err) {
-        console.error("❌ Error checking bans:", err.message);
-    }
-}
 
 // Interval: elke 2 minuten
-setInterval(checkClanBans, 2 * 60 * 1000);
-
+setInterval(checkClanBans, 60_000);
 setInterval(checkClanWarfare, 1 * 60 * 1000);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
