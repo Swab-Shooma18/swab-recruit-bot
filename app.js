@@ -228,7 +228,8 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 embeds: [{
                     color: 0x5865F2,
                     title: "🎧 Voice Activity (beta)",
-                    description: `<@${user}> has spent **${hours}h ${remainingMinutes}m** in voice **this week**. <${user}> ${voiceStatus}`,
+                    description: `<@${user}> has spent **${hours}h ${remainingMinutes}m** in voice **this week**. 
+                    ${voiceStatus}`,
                     footer: { text: `Week: ${weekKey}` }
                 }]
             }
