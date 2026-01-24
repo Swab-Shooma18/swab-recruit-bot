@@ -16,7 +16,8 @@ import VoiceTracking from "./models/voiceTracking.js";
 import { getWeekKey } from "./utils/getWeekKey.js";
 import BanRights from "./utils/banRights.js";
 import {ClanMember} from "./utils/member.js";
-import {PlayerKills} from "./utils/playerKills";
+import { PlayerKills } from './utils/playerKills.js'
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -332,7 +333,16 @@ Total Kills: **${latest.totalKills}**
 
 
     if (name === 'topkillers') {
-        const top = await ClanMember.find().sort({ kills: -1 }).limit(10);
+        const top = await ClanMember.find().sort({ kills: -1 }).limit(10).lean();
+
+
+        if (!Array.isArray(top) || top.length === 0) {
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: '❌ No data found.' }
+            });
+        }
+
 
         const embed = {
             color: 0x1abc9c,
@@ -341,6 +351,7 @@ Total Kills: **${latest.totalKills}**
             footer: { text: 'Clan Stats' },
             timestamp: new Date().toISOString()
         };
+
 
         return res.send({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -351,16 +362,15 @@ Total Kills: **${latest.totalKills}**
 
     if (name === 'weekly') {
         try {
-            const topMembers = await ClanMember.find().sort({ kills: -1 }).limit(10);
+            // Haal top 10 leden op als JS-objecten
+            const topMembers = await ClanMember.find().sort({ kills: -1 }).limit(10).lean();
 
-
-            if (!topMembers || topMembers.length === 0) {
+            if (!Array.isArray(topMembers) || topMembers.length === 0) {
                 return res.send({
                     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                     data: { content: '⚠️ No clan member data found.' }
                 });
             }
-
 
             const embed = {
                 color: 0x1abc9c,
@@ -372,12 +382,10 @@ Total Kills: **${latest.totalKills}**
                 timestamp: new Date()
             };
 
-
             return res.send({
                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                 data: { embeds: [embed] }
             });
-
 
         } catch (err) {
             console.error("❌ Error fetching weekly top killers:", err);

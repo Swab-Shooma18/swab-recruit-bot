@@ -1,4 +1,5 @@
-const mongoose = require('mongoose');
+// utils/playerKills.js
+import mongoose from 'mongoose';
 
 
 const playerKillsSchema = new mongoose.Schema({
@@ -6,5 +7,6 @@ const playerKillsSchema = new mongoose.Schema({
     weeklyKills: { type: Number, default: 0 },
     lastUpdated: { type: Date, default: Date.now }
 });
+
 
 export const PlayerKills = mongoose.model('PlayerKills', playerKillsSchema);
