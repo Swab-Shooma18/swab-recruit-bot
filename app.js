@@ -236,6 +236,58 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
         });
     }
 
+    if (name === "testwarfare") {
+        try {
+// Haal het nieuwste clan warfare event
+            const res = await got('https://api.roatpkz.ps/api/v1/events/clan-warfare', {
+                headers: { 'x-api-key': process.env.ROAT_API_KEY },
+                responseType: 'json',
+                timeout: { request: 5000 }
+            });
+
+
+            const data = res.body;
+            if (!data.content || data.content.length === 0) {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: "❌ Geen warfare events gevonden." }
+                });
+            }
+
+
+            const latest = data.content[0];
+
+
+// Stuur het bericht naar het gewenste kanaal
+            const channel = await client.channels.fetch(process.env.WARFARE_CHANNEL);
+            if (!channel) return console.log("❌ Channel not found");
+
+
+            await channel.send(`
+🏆 **TEST: Latest Clan Warfare Result**
+Winner: **${latest.winnerClan}**
+Winner Kills: ${latest.winnerKills}
+Total Clans: ${latest.totalClans}
+Total Kills: ${latest.totalKills}
+Time Ago: ${latest.timeAgo}
+`);
+
+
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: "✅ Test warfare message sent using the latest API event!" }
+            });
+
+
+        } catch (err) {
+            console.error("❌ Error sending test warfare message:", err.message);
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: `❌ Error: ${err.message}` }
+            });
+        }
+    }
+
     if (name.toLowerCase() === 'add') {
         const username = options[0].value;
 
