@@ -189,7 +189,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
     if (name === "checkvoice") {
         const user = options[0].value;
         const weekKey = getWeekKey();
-
+        const userId = options[0].value;
+        const guild = await client.guilds.fetch(req.body.guild_id);
+        const member = await guild.members.fetch(userId);
 
         const data = await VoiceTracking.findOne({
             userId: user,
@@ -216,6 +218,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = minutes % 60;
 
+        const voiceStatus = member.voice.channel
+            ? `🟢 In voice: **${member.voice.channel.name}**`
+            : `⚪ Not in voice`;
 
         return res.send({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -223,7 +228,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 embeds: [{
                     color: 0x5865F2,
                     title: "🎧 Voice Activity (beta)",
-                    description: `<@${user}> has spent **${hours}h ${remainingMinutes}m** in voice **this week**.`,
+                    description: `<@${user}> has spent **${hours}h ${remainingMinutes}m** in voice **this week**. <${user}> ${voiceStatus}`,
                     footer: { text: `Week: ${weekKey}` }
                 }]
             }
