@@ -550,7 +550,7 @@ async function checkClanWarfare() {
             lastWarfareId = latest.createdAt;
 
 
-            const channel = await client.channels.fetch(process.env.GUILD_ID);
+            const channel = await client.channels.fetch(process.env.WARFARE_CHANNEL);
             if (!channel) return console.log("❌ Channel not found");
 
 
