@@ -15,6 +15,7 @@ import {getJadAndSkotizo} from "./utils/getJadAndSkotizo.js";
 import VoiceTracking from "./models/voiceTracking.js";
 import { getWeekKey } from "./utils/getWeekKey.js";
 import BanRights from "./utils/banRights.js";
+import {ClanMember} from "./utils/member.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -327,6 +328,25 @@ Total Kills: **${latest.totalKills}**
             });
         }
     }
+
+
+    if (name === 'topkillers') {
+        const top = await ClanMember.find().sort({ kills: -1 }).limit(10);
+
+        const embed = {
+            color: 0x1abc9c,
+            title: "🏆 Top 10 Killers",
+            description: top.map((m, i) => `#${i + 1} **${m.username}** – ${m.kills} kills`).join('\n'),
+            footer: { text: 'Clan Stats' },
+            timestamp: new Date().toISOString()
+        };
+
+        return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { embeds: [embed] }
+        });
+    }
+
 
     if (name === 'removebanrights') {
         const inGameName = options[0].value;
@@ -642,6 +662,59 @@ registerEventListeners(client);
 let lastWarfareId = null;
 let lastBanTimestamp = 0;
 
+async function updateClanMembers() {
+    const res = await got('https://api.roatpkz.ps/api/v1/clan/members', {
+        headers: { 'x-api-key': process.env.ROAT_API_KEY },
+        responseType: 'json',
+        timeout: { request: 5000 }
+    });
+
+
+    const members = res.body;
+    if (!Array.isArray(members)) return;
+
+
+    for (const member of members) {
+        try {
+            const playerRes = await got(`https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(member.username)}`, {
+                headers: { 'x-api-key': process.env.ROAT_API_KEY },
+                responseType: 'json'
+            });
+
+
+            const player = playerRes.body;
+
+
+            await ClanMember.findOneAndUpdate(
+                { username: player.username },
+                {
+                    username: player.username,
+                    rankId: player.clan_info.rankId,
+                    rankName: player.clan_info.rankName,
+                    rankedAt: player.clan_info.rankedAt,
+                    lastSeen: player.last_seen,
+                    kills: player.kills,
+                    deaths: player.deaths,
+                    donatorRank: player.donator_rank,
+                    elo: player.elo,
+                    playerRank: player.player_rank,
+                    npcKills: player.npc_kills,
+                    skills: player.skills,
+                    updatedAt: new Date()
+                },
+                { upsert: true }
+            );
+
+
+        } catch (err) {
+            console.error(`❌ Failed to update ${member.username}:`, err.message);
+        }
+    }
+
+
+    console.log(`✅ Updated ${members.length} clan members`);
+}
+
 async function checkClanBans() {
     try {
         const res = await got('https://api.roatpkz.ps/api/v1/clan/bans', {
@@ -780,4 +853,6 @@ Total Kills: **${latest.totalKills}**
 
 setInterval(checkClanBans, 60_000);
 setInterval(checkClanWarfare, 1 * 60 * 1000);
+setInterval(updateClanMembers, 5 * 60 * 1000);
+updateClanMembers();
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
