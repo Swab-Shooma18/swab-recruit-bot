@@ -360,6 +360,24 @@ Total Kills: **${latest.totalKills}**
     }
 
 
+    if (name === 'resetweekly') {
+        try {
+            await PlayerKills.updateMany({}, { $set: { weeklyKills: 0, lastUpdated: new Date() } });
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: "✅ Weekly kills have been reset. The new weekly ranking starts now!" }
+            });
+
+
+        } catch (err) {
+            console.error("❌ Failed to reset weekly kills:", err);
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: "❌ Could not reset weekly kills." }
+            });
+        }
+    }
+
     if (name === 'weekly') {
         try {
             // Haal top 10 leden op als JS-objecten
