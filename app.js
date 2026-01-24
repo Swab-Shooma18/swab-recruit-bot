@@ -12,6 +12,8 @@ import {connectDB} from "./utils/database.js";
 import {getKillCount} from "./utils/getKillCount.js";
 import {getDeathCount} from "./utils/getDeathCount.js";
 import {getJadAndSkotizo} from "./utils/getJadAndSkotizo.js";
+import VoiceTracking from "./models/voiceTracking.js";
+import { getWeekKey } from "./utils/getWeekKey.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,7 +22,12 @@ const PORT = process.env.PORT || 3000;
 // Discord client
 // ========================
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates
+    ]
 });
 
 // ========================
@@ -177,6 +184,44 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
                 data: {content: `❌ REQUEST ERROR`}
             });
         }
+    }
+
+    if (name === "checkvoice") {
+        const user = options[0].value;
+        const weekKey = getWeekKey();
+
+
+        const data = await VoiceTracking.findOne({
+            userId: user,
+            guildId: req.body.guild_id
+        });
+
+
+        if (!data) {
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: "❌ No voice activity found." }
+            });
+        }
+
+
+        const ms = data.weekly.get(weekKey) || 0;
+        const minutes = Math.floor(ms / 60000);
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+
+
+        return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+                embeds: [{
+                    color: 0x5865F2,
+                    title: "🎧 Voice Activity",
+                    description: `<@${user}> has spent **${hours}h ${remainingMinutes}m** in voice **this week**.`,
+                    footer: { text: `Week: ${weekKey}` }
+                }]
+            }
+        });
     }
 
     if (name.toLowerCase() === 'add') {
@@ -337,6 +382,39 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
 });
 
 export default function registerEventListeners(client) {
+    client.on("voiceStateUpdate", async (oldState, newState) => {
+        if (oldState.channelId === newState.channelId) return;
+
+
+        const userId = newState.id;
+        const guildId = newState.guild.id;
+        const now = Date.now();
+        const weekKey = getWeekKey();
+
+
+        let doc = await VoiceTracking.findOne({ userId, guildId });
+        if (!doc) {
+            doc = await VoiceTracking.create({ userId, guildId });
+        }
+
+        if (!oldState.channelId && newState.channelId) {
+            doc.joinedAt = now;
+            await doc.save();
+        }
+        if (oldState.channelId && !newState.channelId && doc.joinedAt) {
+            const duration = now - doc.joinedAt;
+
+
+            doc.weekly.set(
+                weekKey,
+                (doc.weekly.get(weekKey) || 0) + duration
+            );
+
+
+            doc.joinedAt = null;
+            await doc.save();
+        }
+    });
 
     client.on('messageCreate', async (message) => {
         if (message.channelId !== process.env.ACCEPT_CHANNEL_ID) return;
