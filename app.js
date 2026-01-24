@@ -60,6 +60,69 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
 
     const { name, options } = data;
 
+    if (name === 'testwarfare') {
+        try {
+            const resAPI = await got('https://api.roatpkz.ps/api/v1/events/clan-warfare', {
+                headers: { 'x-api-key': process.env.ROAT_API_KEY },
+                responseType: 'json',
+                timeout: { request: 5000 }
+            });
+
+
+            const latest = resAPI.body?.content?.[0];
+            if (!latest) {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: '❌ No warfare data found.' }
+                });
+            }
+
+            if (latest.winnerClan === "Swab") {
+                const embed = {
+                    color: 0x2ecc71,
+                    title: "🏆 Clan Warfare Won! (LATEST)",
+                    description: "**Swab** has won a clan warfare 💪",
+                    fields: [
+                        { name: "🥇 Winner", value: latest.winnerClan, inline: true },
+                        { name: "⚔️ Winner Kills", value: `${latest.winnerKills}`, inline: true },
+                        { name: "🏰 Total Clans", value: `${latest.totalClans}`, inline: true },
+                        { name: "💀 Total Kills", value: `${latest.totalKills}`, inline: true },
+                        { name: "📍 Location", value: latest.location || "Unknown", inline: true },
+                        { name: "🕒 When", value: latest.timeAgo, inline: true }
+                    ],
+                    footer: { text: "USED COMMAND • Clan Warfare" },
+                    timestamp: new Date().toISOString()
+                };
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: {
+                        embeds: [embed]
+                    }
+                });
+            }
+
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: {
+                    content:
+                        `🏆 **Clan Warfare (TEST)**
+Winner: **${latest.winnerClan}**
+Winner Kills: **${latest.winnerKills}**
+Total Clans: **${latest.totalClans}**
+Total Kills: **${latest.totalKills}**
+📍 Location: **${latest.location}**
+🕒 ${latest.timeAgo}`
+                }
+            });
+        } catch (err) {
+            console.error(err);
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: '❌ Failed to fetch warfare data.' }
+            });
+        }
+    }
+
     if (name === "check") {
         const username = options[0].value;
 
@@ -264,7 +327,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async (re
 
 
             await channel.send(`
-🏆 **TEST: Latest Clan Warfare Result**
+🏆 **Latest Clan Warfare Result**
 Winner: **${latest.winnerClan}**
 Winner Kills: ${latest.winnerKills}
 Total Clans: ${latest.totalClans}
@@ -594,49 +657,63 @@ async function checkClanWarfare() {
         const data = res.body;
         if (!data.content || data.content.length === 0) return;
 
-
         const latest = data.content[0];
 
+        if (lastWarfareId === latest.createdAt) return;
+        lastWarfareId = latest.createdAt;
 
-        if (lastWarfareId !== latest.createdAt) {
-            lastWarfareId = latest.createdAt;
-
-
-            const channel = await client.channels.fetch(process.env.WARFARE_CHANNEL);
-            if (!channel) return console.log("❌ Channel not found");
-
-
-            await channel.send(`
-🏆 **New Clan Warfare Result!**
-Winner: **${latest.winnerClan}**
-Winner Kills: ${latest.winnerKills}
-Total Clans: ${latest.totalClans}
-Total Kills: ${latest.totalKills}
-Time Ago: ${latest.timeAgo}
-`);
-
-
-            console.log("✅ Sent new clan warfare notification");
+        const channel = await client.channels.fetch(process.env.WARFARE_CHANNEL);
+        if (!channel) {
+            console.log("❌ Channel not found");
+            return;
         }
+        if (latest.winnerClan === "Swab") {
+            const embed = {
+                color: 0x2ecc71,
+                title: "🏆 Clan Warfare Won!",
+                description: "**Swab** has won a clan warfare 💪",
+                fields: [
+                    { name: "🥇 Winner", value: latest.winnerClan, inline: true },
+                    { name: "⚔️ Winner Kills", value: `${latest.winnerKills}`, inline: true },
+                    { name: "🏰 Total Clans", value: `${latest.totalClans}`, inline: true },
+                    { name: "💀 Total Kills", value: `${latest.totalKills}`, inline: true },
+                    { name: "📍 Location", value: latest.location || "Unknown", inline: true },
+                    { name: "🕒 When", value: latest.timeAgo, inline: true }
+                ],
+                footer: { text: "RoatPkz • Clan Warfare" },
+                timestamp: new Date(latest.createdAt * 1000).toISOString()
+            };
+
+
+            await channel.send({
+                content: "@here",
+                embeds: [embed],
+                allowedMentions: { parse: ['here'] }
+            });
+
+
+            console.log("✅ Sent SWAB embed notification");
+            return;
+        }
+
+        await channel.send(
+            `🏆 **New Clan Warfare Result**
+Winner: **${latest.winnerClan}**
+Winner Kills: **${latest.winnerKills}**
+Total Clans: **${latest.totalClans}**
+Total Kills: **${latest.totalKills}**
+📍 Location: **${latest.location}**
+🕒 ${latest.timeAgo}`
+        );
+
+
+        console.log("ℹ️ Sent plain clan warfare message");
 
 
     } catch (err) {
         console.error("❌ Error checking clan warfare:", err.message);
     }
 }
-
-
-// Start Discord bot
-client.login(process.env.DISCORD_TOKEN)
-    .then(() => {
-        console.log("Bot logged in, starting clan warfare watcher...");
-
-
-// Check elke 2 minuten
-        setInterval(checkClanWarfare, 2 * 60 * 1000);
-    })
-    .catch(err => console.error("Login failed:", err));
-
 
 async function checkClanBans() {
     try {
