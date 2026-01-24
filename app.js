@@ -16,6 +16,7 @@ import VoiceTracking from "./models/voiceTracking.js";
 import { getWeekKey } from "./utils/getWeekKey.js";
 import BanRights from "./utils/banRights.js";
 import {ClanMember} from "./utils/member.js";
+import {PlayerKills} from "./utils/playerKills";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -348,6 +349,45 @@ Total Kills: **${latest.totalKills}**
     }
 
 
+    if (name === 'weekly') {
+        try {
+            const topMembers = await ClanMember.find().sort({ kills: -1 }).limit(10);
+
+
+            if (!topMembers || topMembers.length === 0) {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: '⚠️ No clan member data found.' }
+                });
+            }
+
+
+            const embed = {
+                color: 0x1abc9c,
+                title: "🏆 Weekly Top 10 Killers",
+                description: topMembers
+                    .map((member, index) => `#${index + 1} **${member.username}** – ${member.kills.toLocaleString()} kills`)
+                    .join('\n'),
+                footer: { text: 'Clan Stats • Weekly Ranking' },
+                timestamp: new Date()
+            };
+
+
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { embeds: [embed] }
+            });
+
+
+        } catch (err) {
+            console.error("❌ Error fetching weekly top killers:", err);
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: { content: '❌ Failed to fetch weekly top killers.' }
+            });
+        }
+    }
+
     if (name === 'removebanrights') {
         const inGameName = options[0].value;
 
@@ -663,56 +703,63 @@ let lastWarfareId = null;
 let lastBanTimestamp = 0;
 
 async function updateClanMembers() {
-    const res = await got('https://api.roatpkz.ps/api/v1/clan/members', {
-        headers: { 'x-api-key': process.env.ROAT_API_KEY },
-        responseType: 'json',
-        timeout: { request: 5000 }
-    });
+    try {
+        const res = await got('https://api.roatpkz.ps/api/v1/clan/members', {
+            headers: { 'x-api-key': process.env.ROAT_API_KEY },
+            responseType: 'json',
+            timeout: { request: 5000 }
+        });
 
+        const members = res.body;
+        if (!Array.isArray(members) || members.length === 0) return;
 
-    const members = res.body;
-    if (!Array.isArray(members)) return;
+        // Haal alle spelersdata parallel op
+        await Promise.all(members.map(async (member) => {
+            try {
+                const playerRes = await got(`https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(member.username)}`, {
+                    headers: { 'x-api-key': process.env.ROAT_API_KEY },
+                    responseType: 'json'
+                });
 
+                const player = playerRes.body;
 
-    for (const member of members) {
-        try {
-            const playerRes = await got(`https://api.roatpkz.ps/api/v1/player/${encodeURIComponent(member.username)}`, {
-                headers: { 'x-api-key': process.env.ROAT_API_KEY },
-                responseType: 'json'
-            });
+                // Update clan member
+                await ClanMember.findOneAndUpdate(
+                    { username: player.username },
+                    {
+                        username: player.username,
+                        rankId: player.clan_info.rankId,
+                        rankName: player.clan_info.rankName,
+                        rankedAt: player.clan_info.rankedAt,
+                        lastSeen: player.last_seen,
+                        kills: player.kills,
+                        deaths: player.deaths,
+                        donatorRank: player.donator_rank,
+                        elo: player.elo,
+                        playerRank: player.player_rank,
+                        npcKills: player.npc_kills,
+                        skills: player.skills,
+                        updatedAt: new Date()
+                    },
+                    { upsert: true }
+                );
 
+                // Update weekly kills
+                await PlayerKills.findOneAndUpdate(
+                    { username: player.username },
+                    { $set: { weeklyKills: player.kills, lastUpdated: new Date() } },
+                    { upsert: true }
+                );
 
-            const player = playerRes.body;
+            } catch (err) {
+                console.error(`❌ Failed to update ${member.username}:`, err.message);
+            }
+        }));
 
-
-            await ClanMember.findOneAndUpdate(
-                { username: player.username },
-                {
-                    username: player.username,
-                    rankId: player.clan_info.rankId,
-                    rankName: player.clan_info.rankName,
-                    rankedAt: player.clan_info.rankedAt,
-                    lastSeen: player.last_seen,
-                    kills: player.kills,
-                    deaths: player.deaths,
-                    donatorRank: player.donator_rank,
-                    elo: player.elo,
-                    playerRank: player.player_rank,
-                    npcKills: player.npc_kills,
-                    skills: player.skills,
-                    updatedAt: new Date()
-                },
-                { upsert: true }
-            );
-
-
-        } catch (err) {
-            console.error(`❌ Failed to update ${member.username}:`, err.message);
-        }
+        console.log(`✅ Updated ${members.length} clan members`);
+    } catch (err) {
+        console.error("❌ Failed to fetch clan members:", err.message);
     }
-
-
-    console.log(`✅ Updated ${members.length} clan members`);
 }
 
 async function checkClanBans() {
