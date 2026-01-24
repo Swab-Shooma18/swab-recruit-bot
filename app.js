@@ -380,30 +380,40 @@ Total Kills: **${latest.totalKills}**
 
     if (name === 'weekly') {
         try {
-            // Haal top 10 leden op als JS-objecten
-            const topMembers = await ClanMember.find().sort({ kills: -1 }).limit(10).lean();
+            const limit = 10; // Optioneel: kan uit de command-optie komen
+
+
+// Haal top 10 spelers op op basis van weeklyKills
+            const topMembers = await PlayerKills.find()
+                .sort({ weeklyKills: -1 })
+                .limit(limit)
+                .lean();
+
 
             if (!Array.isArray(topMembers) || topMembers.length === 0) {
                 return res.send({
                     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: '⚠️ No clan member data found.' }
+                    data: { content: '⚠️ No weekly kill data found.' }
                 });
             }
+
 
             const embed = {
                 color: 0x1abc9c,
                 title: "🏆 Weekly Top 10 Killers",
                 description: topMembers
-                    .map((member, index) => `#${index + 1} **${member.username}** – ${member.kills.toLocaleString()} kills`)
+                    .map((player, index) => `#${index + 1} **${player.username}** – ${player.weeklyKills.toLocaleString()} kills`)
                     .join('\n'),
                 footer: { text: 'Clan Stats • Weekly Ranking' },
                 timestamp: new Date()
             };
 
+
             return res.send({
                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                 data: { embeds: [embed] }
             });
+
 
         } catch (err) {
             console.error("❌ Error fetching weekly top killers:", err);
