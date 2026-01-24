@@ -119,7 +119,21 @@ const PLAYER_COMMAND = {
   type: 1,
 };
 
+const CHECKVOICE_COMMAND = {
+  name: 'checkvoice',
+  description: 'Check how much time a user spent in voice this week',
+  options: [
+    {
+      type: 6, // USER
+      name: 'user',
+      description: 'Select a Discord user',
+      required: true,
+    }
+  ],
+  type: 1,
+};
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND];
+
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
