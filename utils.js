@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import {REST, Routes} from "discord.js";
 
 export async function DiscordRequest(endpoint, options) {
   // append endpoint to root API URL
@@ -24,16 +25,24 @@ export async function DiscordRequest(endpoint, options) {
   return res;
 }
 
-export async function InstallGlobalCommands(appId, commands) {
-  // API endpoint to overwrite global commands
-  const endpoint = `applications/${appId}/commands`;
+export async function InstallGlobalCommands(APP_ID, commands) {
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
   try {
-    // This is calling the bulk overwrite endpoint: https://discord.com/developers/docs/interactions/application-commands#bulk-overwrite-global-application-commands
-    await DiscordRequest(endpoint, { method: 'PUT', body: commands });
+    console.log('🔄 Started refreshing global commands...');
+    await rest.put(
+        Routes.applicationCommands(APP_ID), // Globaal
+        { body: commands }
+    );
+    console.log('✅ Successfully reloaded global commands.');
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error registering commands:', err);
   }
+}
+
+
+export function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 // Simple method that returns a random emoji from list
