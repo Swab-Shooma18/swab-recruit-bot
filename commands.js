@@ -173,7 +173,20 @@ const REMOVE_BAN_RIGHTS_COMMAND = {
   type: 1
 };
 
+const TOP_KILLERS_COMMAND = {
+  name: "topkillers",
+  description: "Shows the top killers in the clan based on player stats.",
+  options: [
+    {
+      type: 4,
+      name: "limit",
+      description: "Number of top players to show (default 10)",
+      required: false
+    }
+  ],
+  type: 1
+};
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND,TESTWARFARE_COMMAND,GIVE_BAN_RIGHTS_COMMAND,REMOVE_BAN_RIGHTS_COMMAND];
+const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND,LOOKUP_COMMAND,JAD_SKOTIZO_COMMAND,CHECK_COMMAND,ADD_COMMAND,PLAYER_COMMAND,CHECKVOICE_COMMAND,TESTWARFARE_COMMAND,GIVE_BAN_RIGHTS_COMMAND,REMOVE_BAN_RIGHTS_COMMAND,TOP_KILLERS_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
