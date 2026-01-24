@@ -650,12 +650,12 @@ async function checkClanBans() {
             timeout: { request: 5000 }
         });
 
-
         const bans = res.body;
         if (!Array.isArray(bans) || bans.length === 0) return;
 
         const newBans = bans.filter(b => b.bannedAt > lastBanTimestamp);
         if (newBans.length === 0) return;
+
 
         lastBanTimestamp = Math.max(...newBans.map(b => b.bannedAt));
 
@@ -663,10 +663,19 @@ async function checkClanBans() {
         const channel = await client.channels.fetch(process.env.BAN_CHANNEL);
         if (!channel) return console.log("❌ Ban channel not found");
 
+        const discordMentions = [];
         const banEntries = await Promise.all(
             newBans.slice(0, 10).map(async (ban) => {
                 const mod = await BanRights.findOne({ inGameName: ban.bannedBy });
-                const modLine = mod ? `<@${mod.discordId}> (IG: ${ban.bannedBy})` : ban.bannedBy;
+                let modLine = ban.bannedBy;
+
+
+                if (mod) {
+                    modLine = `<@${mod.discordId}> (IG: ${ban.bannedBy})`;
+                    discordMentions.push(mod.discordId);
+                }
+
+
                 return `**${ban.username}**\n🔨 Banned by: ${modLine}\n🕒 <t:${ban.bannedAt}:R>`;
             })
         );
@@ -685,7 +694,13 @@ async function checkClanBans() {
         };
 
 
-        await channel.send({ embeds: [embed] });
+        await channel.send({
+            embeds: [embed],
+            allowedMentions: { users: discordMentions } // ✅ Zorgt dat de mods echt gepingd worden
+        });
+
+
+        console.log(`✅ Sent ${newBans.length} new ban(s) notification`);
 
 
     } catch (err) {
@@ -763,8 +778,6 @@ Total Kills: **${latest.totalKills}**
     }
 }
 
-
-// Interval: elke 2 minuten
 setInterval(checkClanBans, 60_000);
 setInterval(checkClanWarfare, 1 * 60 * 1000);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
