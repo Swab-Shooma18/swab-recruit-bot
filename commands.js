@@ -188,7 +188,7 @@ const TOP_KILLERS_COMMAND = {
 };
 
 const WEEKLY_TOP_COMMAND = {
-  name: "weeklytop",
+  name: "weekly",
   description: "Shows the weekly top killers in the clan.",
   options: [
     {
