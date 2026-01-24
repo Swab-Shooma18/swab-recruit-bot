@@ -526,6 +526,66 @@ client.login(process.env.DISCORD_TOKEN)
     .catch(err => console.error('Login failed:', err));
 registerEventListeners(client);
 
+
+let lastWarfareId = null;
+
+
+async function checkClanWarfare() {
+    try {
+        const res = await got('https://api.roatpkz.ps/api/v1/events/clan-warfare', {
+            headers: { 'x-api-key': process.env.ROAT_API_KEY },
+            responseType: 'json',
+            timeout: { request: 5000 }
+        });
+
+
+        const data = res.body;
+        if (!data.content || data.content.length === 0) return;
+
+
+        const latest = data.content[0];
+
+
+        if (lastWarfareId !== latest.createdAt) {
+            lastWarfareId = latest.createdAt;
+
+
+            const channel = await client.channels.fetch(process.env.GUILD_ID);
+            if (!channel) return console.log("❌ Channel not found");
+
+
+            await channel.send(`
+🏆 **New Clan Warfare Result!**
+Winner: **${latest.winnerClan}**
+Winner Kills: ${latest.winnerKills}
+Total Clans: ${latest.totalClans}
+Total Kills: ${latest.totalKills}
+Time Ago: ${latest.timeAgo}
+`);
+
+
+            console.log("✅ Sent new clan warfare notification");
+        }
+
+
+    } catch (err) {
+        console.error("❌ Error checking clan warfare:", err.message);
+    }
+}
+
+
+// Start Discord bot
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        console.log("Bot logged in, starting clan warfare watcher...");
+
+
+// Check elke 2 minuten
+        setInterval(checkClanWarfare, 2 * 60 * 1000);
+    })
+    .catch(err => console.error("Login failed:", err));
+
+
 async function checkClanBans() {
     try {
         const res = await got("https://api.roatpkz.ps/api/v1/clan/bans", {
@@ -571,4 +631,6 @@ async function checkClanBans() {
 
 // Interval: elke 2 minuten
 setInterval(checkClanBans, 2 * 60 * 1000);
+
+setInterval(checkClanWarfare, 1 * 60 * 1000);
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
