@@ -140,7 +140,7 @@ const CHECKVOICE_COMMAND = {
 };
 
 const GIVE_BAN_RIGHTS_COMMAND = {
-  name: "givebanrights",
+  name: "linkusername",
   description: "Link ingame username to discord. Used for automatic ban messages.",
   options: [
     {
@@ -160,7 +160,7 @@ const GIVE_BAN_RIGHTS_COMMAND = {
 };
 
 const REMOVE_BAN_RIGHTS_COMMAND = {
-  name: "removebanrights",
+  name: "removelink",
   description: "Remove Discord-ban rights mapping for a given in-game username.",
   options: [
     {

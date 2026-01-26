@@ -34,6 +34,8 @@ const client = new Client({
     ]
 });
 
+
+let lastWarfareKey = null;
 // ========================
 // Cache voor /player
 // ========================
@@ -303,7 +305,7 @@ Total Kills: **${latest.totalKills}**
         });
     }
 
-    if (name === "givebanrights") {
+    if (name === "linkusername") {
         const discordUserId = options[0].value;
         const inGameName = options[1].value;
 
@@ -362,18 +364,37 @@ Total Kills: **${latest.totalKills}**
 
     if (name === 'resetweekly') {
         try {
-            await PlayerKills.updateMany({}, { $set: { weeklyKills: 0, lastUpdated: new Date() } });
+            const members = await ClanMember.find({}, { username: 1, kills: 1 });
+
+
+            for (const m of members) {
+                await PlayerKills.findOneAndUpdate(
+                    { username: m.username },
+                    {
+                        weeklyKills: 0,
+                        lastTotalKills: m.kills,
+                        lastUpdated: new Date()
+                    },
+                    { upsert: true }
+                );
+            }
+
+
             return res.send({
                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { content: "✅ Weekly kills have been reset. The new weekly ranking starts now!" }
+                data: {
+                    content: '✅ Weekly kills have been reset. New week starts now!'
+                }
             });
 
 
         } catch (err) {
-            console.error("❌ Failed to reset weekly kills:", err);
+            console.error('❌ resetweekly failed:', err);
             return res.send({
                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { content: "❌ Could not reset weekly kills." }
+                data: {
+                    content: '❌ Failed to reset weekly kills.'
+                }
             });
         }
     }
@@ -424,7 +445,7 @@ Total Kills: **${latest.totalKills}**
         }
     }
 
-    if (name === 'removebanrights') {
+    if (name === 'removelink') {
         const inGameName = options[0].value;
 
 
@@ -781,11 +802,34 @@ async function updateClanMembers() {
                 );
 
                 // Update weekly kills
-                await PlayerKills.findOneAndUpdate(
-                    { username: player.username },
-                    { $set: { weeklyKills: player.kills, lastUpdated: new Date() } },
-                    { upsert: true }
-                );
+                const record = await PlayerKills.findOne({ username: player.username });
+
+
+                if (!record) {
+// Eerste keer
+                    await PlayerKills.create({
+                        username: player.username,
+                        weeklyKills: 0,
+                        lastTotalKills: player.kills,
+                        lastUpdated: new Date()
+                    });
+                } else {
+                    const gained = player.kills - record.lastTotalKills;
+
+
+                    if (gained > 0) {
+                        await PlayerKills.updateOne(
+                            { username: player.username },
+                            {
+                                $inc: { weeklyKills: gained }, // ✅ WEEKLY += verschil
+                                $set: {
+                                    lastTotalKills: player.kills,
+                                    lastUpdated: new Date()
+                                }
+                            }
+                        );
+                    }
+                }
 
             } catch (err) {
                 console.error(`❌ Failed to update ${member.username}:`, err.message);
@@ -866,26 +910,30 @@ async function checkClanBans() {
 
 async function checkClanWarfare() {
     try {
-        const res = await got('https://api.roatpkz.ps/api/v1/events/clan-warfare', {
-            headers: { 'x-api-key': process.env.ROAT_API_KEY },
-            responseType: 'json',
-            timeout: { request: 5000 }
-        });
+        const res = await got(
+            'https://api.roatpkz.ps/api/v1/events/clan-warfare',
+            {
+                headers: { 'x-api-key': process.env.ROAT_API_KEY },
+                responseType: 'json',
+                timeout: { request: 5000 }
+            }
+        );
 
 
-        const data = res.body;
-        if (!data.content || data.content.length === 0) return;
+        const latest = res.body?.content?.[0];
+        if (!latest || !latest.winnerClan) return;
 
-        const latest = data.content[0];
 
-        if (lastWarfareId === latest.createdAt) return;
-        lastWarfareId = latest.createdAt;
+        const warfareKey = `${latest.createdAt}_${latest.winnerClan}_${latest.totalKills}`;
+
+
+        if (lastWarfareKey === warfareKey) return;
+
 
         const channel = await client.channels.fetch(process.env.WARFARE_CHANNEL);
-        if (!channel) {
-            console.log("❌ Channel not found");
-            return;
-        }
+        if (!channel) return;
+
+
         if (latest.winnerClan === "Swab") {
             const embed = {
                 color: 0x2ecc71,
@@ -896,11 +944,10 @@ async function checkClanWarfare() {
                     { name: "⚔️ Winner Kills", value: `${latest.winnerKills}`, inline: true },
                     { name: "🏰 Total Clans", value: `${latest.totalClans}`, inline: true },
                     { name: "💀 Total Kills", value: `${latest.totalKills}`, inline: true },
-                    { name: "📍 Location", value: latest.location || "Unknown", inline: true },
-                    { name: "🕒 When", value: latest.timeAgo, inline: true }
+                    { name: "📍 Location", value: latest.location || "Unknown", inline: true }
                 ],
                 footer: { text: "RoatPkz • Clan Warfare" },
-                timestamp: new Date(latest.createdAt * 1000).toISOString()
+                timestamp: new Date().toISOString()
             };
 
 
@@ -911,26 +958,28 @@ async function checkClanWarfare() {
             });
 
 
-            console.log("✅ Sent SWAB embed notification");
-            return;
-        }
-
-        await channel.send(
-            `🏆 **New Clan Warfare Result**
+            console.log("✅ Warfare embed sent");
+        } else {
+            await channel.send(
+                `🏆 **Clan Warfare Result**
 Winner: **${latest.winnerClan}**
 Winner Kills: **${latest.winnerKills}**
 Total Clans: **${latest.totalClans}**
 Total Kills: **${latest.totalKills}**
-📍 Location: **${latest.location}**
-🕒 ${latest.timeAgo}`
-        );
+📍 Location: **${latest.location || 'Unknown'}**`
+            );
 
 
-        console.log("ℹ️ Sent plain clan warfare message");
+            console.log("ℹ️ Warfare text sent");
+        }
+
+
+// ❗ pas NA succesvol verzenden
+        lastWarfareKey = warfareKey;
 
 
     } catch (err) {
-        console.error("❌ Error checking clan warfare:", err.message);
+        console.error("❌ Error checking clan warfare:", err);
     }
 }
 
