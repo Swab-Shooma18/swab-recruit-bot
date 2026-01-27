@@ -258,50 +258,45 @@ Total Kills: **${latest.totalKills}**
     if (name === "topvoice") {
         try {
             const weekKey = getWeekKey();
-
-            const docs = await VoiceTracking.find({ guildId: req.body.guild_id });
-
-
-            if (!docs.length) {
-                return res.send({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: "⚠️ No voice data found." }
-                });
-            }
-
-            const list = docs.map(doc => {
-                const ms = (doc.weekly[weekKey] || 0) + (doc.joinedAt ? Date.now() - doc.joinedAt : 0);
-                return { userId: doc.userId, ms };
-            });
-
-
-// sorteer op ms en pak top 10
-            const top10 = list.sort((a, b) => b.ms - a.ms).slice(0, 10);
-
-
             const guild = await client.guilds.fetch(req.body.guild_id);
 
 
-// haal alleen de top 10 leden op uit de guild cache/API
-            const members = await Promise.all(
-                top10.map(t => guild.members.fetch(t.userId).catch(() => null))
-            );
+// haal alle voice entries voor de guild
+            const docs = await VoiceTracking.find({ guildId: req.body.guild_id });
 
 
-            const embedDescription = top10.map((t, i) => {
-                const member = members[i];
-                const name = member ? member.displayName : `<@${t.userId}>`;
-                const ms = t.ms;
+// bereken per user hun tijd deze week
+            const list = await Promise.all(docs.map(async doc => {
+                let ms = doc.weekly[weekKey] || 0;
+                if (doc.joinedAt) ms += Date.now() - doc.joinedAt;
+
+
+                let username = `<@${doc.userId}>`; // fallback
+                try {
+                    const member = await guild.members.fetch(doc.userId);
+                    username = member.displayName;
+                } catch {} // user left → fallback
+
+
+                return { username, ms };
+            }));
+
+
+// sorteer en pak top 10
+            const top = list.sort((a, b) => b.ms - a.ms).slice(0, 10);
+
+
+            const formatTime = ms => {
                 const h = Math.floor(ms / 3600000);
                 const m = Math.floor((ms % 3600000) / 60000);
-                return `#${i + 1} **${name}** – ${h}h ${m}m`;
-            }).join("\n");
+                return `${h}h ${m}m`;
+            };
 
 
             const embed = {
                 color: 0x5865F2,
-                title: "🎧 Top 10 Voice Activity (This Week)",
-                description: embedDescription,
+                title: `🎧 Top 10 Voice Activity (This Week)`,
+                description: top.map((u, i) => `#${i + 1} **${u.username}** – ${formatTime(u.ms)}`).join('\n'),
                 footer: { text: `Week: ${weekKey}` },
                 timestamp: new Date()
             };
@@ -317,7 +312,7 @@ Total Kills: **${latest.totalKills}**
             console.error(err);
             return res.send({
                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { content: "❌ Failed to fetch voice stats." }
+                data: { content: '❌ Failed to fetch top voice stats.' }
             });
         }
     }
