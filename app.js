@@ -270,7 +270,7 @@ Total Kills: **${latest.totalKills}**
             }
 
             const list = docs.map(doc => {
-                const ms = (doc.weekly.get(weekKey) || 0) + (doc.joinedAt ? Date.now() - doc.joinedAt : 0);
+                const ms = (doc.weekly[weekKey] || 0) + (doc.joinedAt ? Date.now() - doc.joinedAt : 0);
                 return { userId: doc.userId, ms };
             });
 
