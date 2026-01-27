@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const VoiceTrackingSchema = new mongoose.Schema({
     userId: { type: String, required: true },
     guildId: { type: String, required: true },
-    username: { type: String },
+    username: { type: String , default: null},
     // actieve sessie
     joinedAt: { type: Number, default: null },
 

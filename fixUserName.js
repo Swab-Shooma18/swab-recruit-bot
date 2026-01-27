@@ -1,6 +1,16 @@
 import 'dotenv/config';
 import VoiceTracking from "./models/voiceTracking.js";
 import {Client, GatewayIntentBits} from "discord.js";
+import mongoose from "mongoose";
+
+try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ MongoDB connected");
+} catch (err) {
+    console.error("❌ MongoDB connection failed:", err);
+    process.exit(1);
+}
+
 
 const client = new Client({
     intents: [
@@ -12,7 +22,7 @@ const client = new Client({
 });
 
 client.login(process.env.DISCORD_TOKEN)
-    .then(() => console.log('Bot logged in!'))
+    .then(() => console.log('client logged in!'))
     .catch(err => console.error('Login failed:', err));
 
 // wacht tot bot ready is
@@ -30,7 +40,7 @@ for (const doc of docs) {
             { username: member.displayName }
         );
     } catch {
-        // user left guild → skip
+        console.log(`Skipped user ${doc.userId}: ${err.message}`);
     }
 }
 
