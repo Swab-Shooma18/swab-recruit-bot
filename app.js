@@ -258,7 +258,6 @@ Total Kills: **${latest.totalKills}**
     if (name === "topvoice") {
         try {
             const weekKey = getWeekKey();
-            const guild = await client.guilds.fetch(req.body.guild_id);
 
 
 // haal alle voice entries voor de guild
@@ -266,20 +265,14 @@ Total Kills: **${latest.totalKills}**
 
 
 // bereken per user hun tijd deze week
-            const list = await Promise.all(docs.map(async doc => {
+            const list = docs.map(doc => {
                 let ms = doc.weekly[weekKey] || 0;
                 if (doc.joinedAt) ms += Date.now() - doc.joinedAt;
 
 
-                let username = `<@${doc.userId}>`; // fallback
-                try {
-                    const member = await guild.members.fetch(doc.userId);
-                    username = member.displayName;
-                } catch {} // user left → fallback
-
-
+                let username = doc.username ?? `<@${doc.userId}>`; // fallback
                 return { username, ms };
-            }));
+            });
 
 
 // sorteer en pak top 10
