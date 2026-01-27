@@ -256,78 +256,58 @@ Total Kills: **${latest.totalKills}**
     }
 
     if (name === "topvoice") {
-        try {
-            const guildId = req.body.guild_id;
-            const weekKey = getWeekKey();
+        const weekKey = getWeekKey();
+        const guild = await client.guilds.fetch(req.body.guild_id);
 
-            const all = await VoiceTracking.find({ guildId }).lean();
 
-            if (!all.length) {
-                return res.send({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: "⚠️ No voice data found." }
+// alle voice tracking documenten van deze guild
+        const allData = await VoiceTracking.find({ guildId: req.body.guild_id });
+
+
+        const list = [];
+
+
+        for (const doc of allData) {
+            try {
+                const member = await guild.members.fetch(doc.userId);
+                const ms = (doc.weekly.get(weekKey) || 0) + (doc.joinedAt ? Date.now() - doc.joinedAt : 0);
+
+
+                list.push({
+                    id: doc.userId,
+                    name: member.displayName,
+                    ms
                 });
+            } catch {
+// gebruiker heeft de server verlaten of kan niet worden opgehaald
             }
-
-            const ranked = all
-                .map(u => {
-                    let ms = u.weekly?.[weekKey] || 0;
-
-                    if (u.joinedAt) {
-                        ms += Date.now() - u.joinedAt;
-                    }
-
-                    return {
-                        userId: u.userId,
-                        username: u.username || "Unknown",
-                        ms
-                    };
-                })
-                .filter(u => u.ms > 0)
-                .sort((a, b) => b.ms - a.ms)
-                .slice(0, 10);
-
-
-            if (!ranked.length) {
-                return res.send({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: "⚠️ No voice activity this week." }
-                });
-            }
-
-            const formatTime = ms => {
-                const h = Math.floor(ms / 3600000);
-                const m = Math.floor((ms % 3600000) / 60000);
-                return `${h}h ${m}m`;
-            };
-
-
-            const embed = {
-                color: 0x5865F2,
-                title: "🎧 Top 10 Voice Activity (This Week)",
-                description: ranked
-                    .map((u, i) =>
-                        `#${i + 1} **${u.username}** – ${formatTime(u.ms)}`
-                    )
-                    .join("\n"),
-                footer: { text: `Week: ${weekKey}` },
-                timestamp: new Date()
-            };
-
-
-            return res.send({
-                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { embeds: [embed] }
-            });
-
-
-        } catch (err) {
-            console.error("❌ topvoice error:", err);
-            return res.send({
-                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                data: { content: "❌ Failed to fetch top voice stats." }
-            });
         }
+
+
+// sorteer op voice time
+        list.sort((a, b) => b.ms - a.ms);
+        const top10 = list.slice(0, 10);
+
+
+        const formatTime = ms => {
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            return `${h}h ${m}m`;
+        };
+
+
+        const embed = {
+            color: 0x5865F2,
+            title: "🎧 Top 10 Voice Activity (This Week)",
+            description: top10.map((u, i) => `#${i + 1} **${u.name}** – ${formatTime(u.ms)}`).join("\n"),
+            timestamp: new Date()
+        };
+
+
+        return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: { embeds: [embed] }
+        });
     }
 
     if (name === "checkvoice") {
@@ -341,7 +321,6 @@ Total Kills: **${latest.totalKills}**
             userId: user,
             guildId: req.body.guild_id
         });
-
 
         if (!data) {
             return res.send({
