@@ -159,8 +159,8 @@ Total Kills: **${latest.totalKills}**
             // Old tracked stats
             const oldKills = Number(player.kills);
             const oldDeaths = Number(player.deaths);
-            const oldJad = Number(player.jad || 0);
-            const oldSkotizo = Number(player.skotizo || 0);
+            const oldJad = Number(player.jadKills || 0);
+            const oldSkotizo = Number(player.skotizoKills || 0);
 
             // Differences
             const diffKills = liveKillCount - oldKills;
@@ -190,12 +190,12 @@ Total Kills: **${latest.totalKills}**
 • Now: **${liveDeathCount}**  
 📉 Change: **${diffDeathsStr}**
 
-🌋 **Jad kills:**  
+🌋 **Jad kills:**  (beta) 
 • First tracked: **${oldJad}**  
 • Now: **${liveJad}**  
 📈 Change: **${diffJadStr}**
 
-👹 **Skotizo kills:**  
+👹 **Skotizo kills:**  (beta)
 • First tracked: **${oldSkotizo}**  
 • Now: **${liveSkotizo}**  
 📈 Change: **${diffSkotizoStr}**
