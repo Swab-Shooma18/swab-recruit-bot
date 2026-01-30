@@ -640,6 +640,7 @@ Total Kills: **${latest.totalKills}**
     // Prepare embed
     // ========================
     const kd = playerData.deaths === 0 ? playerData.kills : (playerData.kills / playerData.deaths).toFixed(2);
+    const ja = await getJadAndSkotizo(username);
 
     const embed = {
         type: 'rich',
@@ -652,8 +653,8 @@ Total Kills: **${latest.totalKills}**
             { name: '🔥 ELO', value: `${playerData.elo}`, inline: true },
             { name: '🏰 Clan Rank', value: playerData.clan_info?.rankName || 'None', inline: true },
             { name: '💎 Donator', value: DONATOR_RANKS[playerData.donator_rank] || 'None', inline: true },
-            { name: '🌋 Jad', value: playerData.jad?.count || '0', inline: true },
-            { name: '👹 Skotizo', value: playerData.skotizo?.count || '0', inline: true },
+            { name: '🌋 Jad', value: `${ja.jad}` || '0', inline: true },
+            { name: '👹 Skotizo', value: `${ja.skotizo}` || '0', inline: true },
             { name: '🕒 Last Seen', value: playerData.last_seen || 'Unknown', inline: false }
         ],
         timestamp: new Date().toISOString(),
