@@ -639,17 +639,10 @@ Total Kills: **${latest.totalKills}**
     // Prepare embed
     // ========================
     const kd = playerData.deaths === 0 ? playerData.kills : (playerData.kills / playerData.deaths).toFixed(2);
-    let ja = { jad: 0, skotizo: 0 };
-
-    try {
-        ja = await getJadAndSkotizo(username);
-    } catch (err) {
-        console.error('Jad/Skotizo error:', err.message);
-    }
 
     const embed = {
         type: 'rich',
-        title: `📄${playerData.display_name || playerData.username}`,
+        title: `📄PLAYER: ${playerData.display_name || playerData.username}`,
         color: 0xffcc00,
         fields: [
             { name: '⚔️ Kills', value: `${playerData.kills}`, inline: true },
@@ -658,8 +651,6 @@ Total Kills: **${latest.totalKills}**
             { name: '🔥 ELO', value: `${playerData.elo}`, inline: true },
             { name: '🏰 Clan Rank', value: playerData.clan_info?.rankName || 'None', inline: true },
             { name: '💎 Donator', value: DONATOR_RANKS[playerData.donator_rank] || 'None', inline: true },
-            { name: '🌋 Jad', value: String(ja?.jad ?? 0) || '0', inline: true },
-            { name: '👹 Skotizo', value: String(ja?.skotizo ?? 0)  || '0', inline: true },
             { name: '🕒 Last Seen', value: playerData.last_seen || 'Unknown', inline: false }
         ],
         timestamp: new Date().toISOString(),
